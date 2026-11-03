@@ -1,0 +1,17 @@
+{
+    "schema": 1,
+    "name": "SymsvelModuleLanguages",
+    "dependencies": {},
+    "tables": [],
+    "components": {
+        "back": "back",
+        "bo": "bo",
+        "app": "app"
+    },
+    "documentation": {
+        "dev": "docs/dev",
+        "admin": "docs/admin",
+        "user": "docs/user"
+    },
+    "extensions": []
+}

@@ -1,0 +1,30 @@
+{
+    "manifests": {
+        "symsvel-framework/module-symsvel-module-languages": {
+            "manifest": {
+                "bundles": {
+                    "SymSvel\\Module\\SymsvelModuleLanguages\\SymsvelModuleLanguagesBundle": [
+                        "all"
+                    ]
+                },
+                "copy-from-recipe": {
+                    "config/": "%CONFIG_DIR%/"
+                }
+            },
+            "files": {
+                "config/routes/symsvel-module-languages.yaml": {
+                    "contents": [
+                        "symsvel-module-languages:",
+                        "    resource:",
+                        "        path: '@SymsvelModuleLanguagesBundle/src/Controller/'",
+                        "        namespace: SymSvel\\Module\\SymsvelModuleLanguages\\Controller",
+                        "    type: attribute",
+                        ""
+                    ],
+                    "executable": false
+                }
+            },
+            "ref": "REPLACE_WITH_RECIPE_COMMIT_SHA"
+        }
+    }
+}
