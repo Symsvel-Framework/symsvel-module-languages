@@ -1,6 +1,6 @@
 {
-    "name": "symsvel-framework/module-symsvel-module-languages",
-    "description": "SymSvel module SymsvelModuleLanguages",
+    "name": "symsvel-framework/module-languages",
+    "description": "SymSvel module Languages",
     "type": "symfony-bundle",
     "license": "proprietary",
     "require": {
@@ -9,12 +9,12 @@
     },
     "autoload": {
         "psr-4": {
-            "SymSvel\\Module\\SymsvelModuleLanguages\\": "back/src/"
+            "SymSvel\\Module\\Languages\\": "back/src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "SymSvel\\Module\\SymsvelModuleLanguages\\Tests\\": "back/tests/"
+            "SymSvel\\Module\\Languages\\Tests\\": "back/tests/"
         }
     },
     "require-dev": {

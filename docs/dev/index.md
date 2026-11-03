@@ -1,3 +1,3 @@
-# SymsvelModuleLanguages
+# Languages
 
 Documentation développeur.

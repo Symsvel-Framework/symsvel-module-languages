@@ -1,9 +1,9 @@
 {
     "manifests": {
-        "symsvel-framework/module-symsvel-module-languages": {
+        "symsvel-framework/module-languages": {
             "manifest": {
                 "bundles": {
-                    "SymSvel\\Module\\SymsvelModuleLanguages\\SymsvelModuleLanguagesBundle": [
+                    "SymSvel\\Module\\Languages\\LanguagesBundle": [
                         "all"
                     ]
                 },
@@ -12,12 +12,12 @@
                 }
             },
             "files": {
-                "config/routes/symsvel-module-languages.yaml": {
+                "config/routes/languages.yaml": {
                     "contents": [
-                        "symsvel-module-languages:",
+                        "languages:",
                         "    resource:",
-                        "        path: '@SymsvelModuleLanguagesBundle/src/Controller/'",
-                        "        namespace: SymSvel\\Module\\SymsvelModuleLanguages\\Controller",
+                        "        path: '@LanguagesBundle/src/Controller/'",
+                        "        namespace: SymSvel\\Module\\Languages\\Controller",
                         "    type: attribute",
                         ""
                     ],
