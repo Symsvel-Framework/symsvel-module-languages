@@ -1,18 +1,34 @@
-# Languages : référentiel natif
+# Languages : administration
 
-Le module natif fournit un référentiel de 117 langues officielles
-(nom natif et code ISO), avec trois usages administratifs :
-**désactivée**, **préouverture** (traductions BO seulement) et
-**active** (publique et BO).
+Languages est un **module natif obligatoire**. Il propose
+117 langues officielles avec code et nom natif, reprises de XCore.
 
-Le Setup impose le choix de la langue principale sans valeur
-présélectionnée. Elle ne peut plus être modifiée ni désactivée après
-son initialisation. Le multilinguisme peut ensuite être activé ou
-désactivé indépendamment des statuts des langues.
+## États
 
-L'interface BO affiche les noms localisés dans la langue de traduction
-demandée, avec repli sur le nom natif. Aucune détection géographique
-ou téléchargement de langues n'est effectué pendant l'installation.
+- **Désactivée** : ni disponible publiquement, ni proposée à la préparation BO.
+- **Préouverture** : accessible au BO pour préparer les traductions, pas publique.
+- **Active** : disponible au BO et publiquement si le mode multilingue est actif.
 
-Les règles de sécurité et les tests seront complétés avec les
-endpoints et les écrans.
+La langue principale est sélectionnée explicitement, sans
+présélection, lors du Setup. Elle est activée automatiquement et
+**ne peut plus être modifiée ni désactivée** après installation.
+Elle reste la seule langue proposée publiquement lorsque le
+multilinguisme est inactif.
+
+## Écran BO
+
+La page `/languages` permet de rechercher les langues, les trier,
+les paginer et modifier les états **Active** et **Préouverture**.
+Le code de langue et le libellé localisé sont affichés.
+Les actions sont contrôlées côté API par les ACL
+`languages.list` et `languages.manage`; le verrou de la
+langue principale est appliqué côté serveur.
+
+Dans **Settings**, `languages.primary_language` est en lecture
+seule et `languages.multilingual` détermine l'exposition publique
+des langues actives. La langue d'administration demeure indépendante
+du mode multilingue public. Les noms sont traduits par PHP Intl,
+avec repli sur le nom natif.
+
+Aucune sonde système, synchronisation réseau ou installation de
+traductions n'est lancée automatiquement.
