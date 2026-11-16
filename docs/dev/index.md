@@ -85,3 +85,15 @@ Seul `symsvel:languages:bootstrap:stdin` configure cette clé depuis
 le Setup local. Une seconde initialisation avec un code différent
 échoue en `DomainException` ; aucune mutation silencieuse de la
 langue principale n'est possible.
+
+## Tests de règles métier (16/11/2026)
+
+`LanguageCatalogTest` valide la configuration unique de langue
+principale, l'idempotence d'une reprise du Setup, les refus de
+réaffectation/désactivation, les trois états (active, préouverture,
+inactive), l'effet de `languages.multilingual`, le référentiel XCore
+de 117 codes sans doublons et la priorité de `translation_lang`
+sur la langue d'interface. Les tests utilisent Doctrine ORM/DBAL et
+SQLite en mémoire ; il faudra exécuter les vraies migrations compilées
+en CT PostgreSQL/MySQL/MariaDB/SQLite. Le workflow CI inclut désormais
+le lint PHP du module et de ses migrations.
