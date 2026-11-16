@@ -1,0 +1,26 @@
+import { describe, expect, it } from 'vitest';
+import { languageCopy, filterLanguages, type BoLanguage } from './presentation';
+import { boNavigation } from './navigation';
+
+const rows: BoLanguage[] = [
+  { iso_code: 'en', name: 'English', active: false, pre_open: false, primary: false },
+  { iso_code: 'fr', name: 'français', active: true, pre_open: false, primary: true },
+  { iso_code: 'de', name: 'Deutsch', active: false, pre_open: true, primary: false }
+];
+
+describe('Languages BO', () => {
+  it('registers a module-owned ACL-protected route', () => {
+    expect(boNavigation.resource).toBe('languages');
+    expect(boNavigation.probe).toBe('/apibo/languages');
+  });
+  it('keeps all statuses and primary protection metadata', () => {
+    expect(rows[1].primary).toBe(true);
+    expect(rows[2].pre_open).toBe(true);
+  });
+  it('filters, sorts and localizes', () => {
+    expect(filterLanguages(rows, 'FR', 'name', 'asc', 'fr').map(x => x.iso_code)).toEqual(['fr']);
+    expect(filterLanguages(rows, '', 'name', 'asc', 'fr').map(x => x.iso_code)).toEqual(['de','en','fr']);
+    expect(languageCopy('fr-FR').primaryProtected).toContain('principale');
+    expect(languageCopy('en-US').primary).toBe('Primary');
+  });
+});

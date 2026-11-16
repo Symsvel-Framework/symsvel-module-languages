@@ -61,3 +61,17 @@ paramètres n'est créée par Languages. Le BO ne peut pas modifier la
 langue principale : ce verrou doit être confirmé par les tests
 d'intégration. L'authentification BO est déléguée à `BoAccessGate`,
 sans parser ni valider à nouveau les tokens dans Languages.
+
+## Interface BO et contrôle d'accès (16/11/2026)
+
+Le module déclare `boNavigation`, une route `/languages`
+avec ACL `languages.list` et une sonde `/apibo/languages`.
+La page Svelte utilise les composants `DataTable`, `Button`
+et `Alert` de l'hôte, sans importer `AppShell` XCore.
+Recherche, tri, pagination et messages FR/EN sont portés par
+`presentation.ts`. Les actions de statut passent par `boApi`,
+avec verrou côté UI pour la désactivation de la langue principale ;
+la validation réelle demeure dans le service PHP. Le workflow QA
+assemble le BO hôte et exécute les contrôles Svelte/TypeScript,
+la compilation et Vitest. Le module est conçu pour fonctionner
+sans serveur Node de production.
