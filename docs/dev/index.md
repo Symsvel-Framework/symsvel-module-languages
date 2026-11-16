@@ -30,3 +30,34 @@ langues en `pre_open` apparaissent uniquement côté BO.
 
 L'état de validation du module natif exige la compilation de ses
 migrations par Tooling, la CI et un CT initial multibase XT.
+
+## Services et API du module (16/11/2026)
+
+`LanguageCatalog` possède les règles de visibilité, le tri localisé
+`Collator`, le repli sur les noms natifs et la protection de la langue
+principale. `LanguageLocaleResolver` reconnaît `translation_lang`
+(le champ déjà envoyé par les clients SymSvel), `locale`, `ui_lang`
+et en dernier recours `Accept-Language`.
+
+- `GET /apiopen/languages` et `GET /api/languages` : langues
+  actives seulement, ramenées à la langue principale si le
+  multilinguisme est désactivé.
+- `GET /apibo/languages` : catalogue complet, ACL `languages.list`.
+- `GET /apibo/languages/available` : actives ou préouvertes, même ACL.
+- `PATCH /apibo/languages/{code}` : modification atomique des booléens
+  `active` et `pre_open`, ACL `languages.manage`, rejet de la
+  désactivation de la langue principale.
+- `GET /setup/languages` : liste en noms natifs uniquement depuis
+  loopback et pendant `database_ready`, sans exposer le setup après
+  finalisation.
+- `symsvel:languages:bootstrap:stdin` : commandée exclusivement par le
+  Setup local ; accepte `{"language":"fr"}`, active la langue principale
+  et refuse un changement de langue une fois configurée.
+
+Les clés Settings sont `languages.primary_language` (bloquante,
+renseignée par le Setup) et `languages.multilingual` (0/1, défaut
+logique désactivé). Settings fournit la persistance ; aucune table de
+paramètres n'est créée par Languages. Le BO ne peut pas modifier la
+langue principale : ce verrou doit être confirmé par les tests
+d'intégration. L'authentification BO est déléguée à `BoAccessGate`,
+sans parser ni valider à nouveau les tokens dans Languages.
