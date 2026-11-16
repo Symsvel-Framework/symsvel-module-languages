@@ -97,3 +97,10 @@ sur la langue d'interface. Les tests utilisent Doctrine ORM/DBAL et
 SQLite en mémoire ; il faudra exécuter les vraies migrations compilées
 en CT PostgreSQL/MySQL/MariaDB/SQLite. Le workflow CI inclut désormais
 le lint PHP du module et de ses migrations.
+
+### Correction du test de tri (16/11/2026)
+
+Le test d'intégration n'impose plus à tort l'ordre ISO lorsque
+`LanguageCatalog` trie les langues selon leur **libellé traduit**.
+La vérification d'appartenance trie une copie des codes avant
+comparaison. La règle métier de tri XCore reste intacte.

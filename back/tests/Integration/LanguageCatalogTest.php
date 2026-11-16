@@ -93,8 +93,10 @@ final class LanguageCatalogTest extends TestCase
         try {
             $catalog->initializePrimary('fr');
             $catalog->update('de', false, true);
-            self::assertSame(['de', 'fr'],
-                array_column($catalog->availableForAdministration('en'), 'iso_code'));
+            $availableCodes = array_column($catalog->availableForAdministration('en'), 'iso_code');
+            // API sorts the translated display names, not the ISO codes.
+            sort($availableCodes);
+            self::assertSame(['de', 'fr'], $availableCodes);
             self::assertSame(['fr'], array_column($catalog->publicLanguages('en'), 'iso_code'));
 
             $catalog->update('de', true, false);
