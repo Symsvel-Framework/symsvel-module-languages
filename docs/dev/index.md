@@ -75,3 +75,13 @@ la validation réelle demeure dans le service PHP. Le workflow QA
 assemble le BO hôte et exécute les contrôles Svelte/TypeScript,
 la compilation et Vitest. Le module est conçu pour fonctionner
 sans serveur Node de production.
+
+## Protection de la langue principale dans Settings (16/11/2026)
+
+La définition `languages.primary_language` utilise `editable:false`
+du module Settings : GET affiche la valeur, mais les requêtes directes
+`PUT /apibo/settings/languages.primary_language` reçoivent un refus.
+Seul `symsvel:languages:bootstrap:stdin` configure cette clé depuis
+le Setup local. Une seconde initialisation avec un code différent
+échoue en `DomainException` ; aucune mutation silencieuse de la
+langue principale n'est possible.

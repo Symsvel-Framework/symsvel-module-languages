@@ -18,6 +18,7 @@ final class LanguagesSettingDefinitionProvider implements SettingDefinitionProvi
             group: 'languages',
             required: true,
             blocking: true,
+            editable: false,
             description: 'Choisie explicitement au Setup ; elle ne peut plus être changée.',
         );
         yield new SettingDefinition(
