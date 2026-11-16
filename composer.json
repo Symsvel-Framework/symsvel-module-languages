@@ -5,7 +5,12 @@
     "license": "proprietary",
     "require": {
         "php": ">=8.4",
-        "symfony/framework-bundle": "^8.1"
+        "doctrine/dbal": "^4.0",
+        "symfony/console": "^8.1",
+        "symfony/framework-bundle": "^8.1",
+        "symfony/intl": "^8.1",
+        "symsvel-framework/module-settings": "dev-dev",
+        "symsvel-framework/module-acls": "dev-dev"
     },
     "autoload": {
         "psr-4": {
@@ -33,5 +38,15 @@
         "branch-alias": {
             "dev-main": "1.0.x-dev"
         }
-    }
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/Symsvel-Framework/symsvel-module-settings.git"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/Symsvel-Framework/symsvel-module-acls.git"
+        }
+    ]
 }
