@@ -35,6 +35,24 @@ final readonly class BoLanguagesController
         return self::reply(['data' => $this->languages->availableForAdministration($this->locales->resolve($request))]);
     }
 
+    /** Active account languages may be read by any BO actor allowed to manage accounts. */
+    #[Route('/apibo/languages/account-options', name: 'symsvel_languages_bo_account_options', methods: ['GET'], format: 'json')]
+    public function accountOptions(Request $request): JsonResponse
+    {
+        $authorized = false;
+        $status = 403;
+        foreach ([['admins', 'create'], ['admins', 'update'], ['users', 'create'], ['users', 'update'], ['languages', 'list']] as [$module, $action]) {
+            $decision = $this->gate->check($request, $module, $action);
+            if ($decision->allowed()) {
+                $authorized = true;
+                break;
+            }
+            if ($decision->status === 401) $status = 401;
+        }
+        if (!$authorized) return self::fail($status);
+        return self::reply(['data' => $this->languages->activeForAccounts($this->locales->resolve($request))]);
+    }
+
     #[Route('/apibo/languages/{code<[a-z]{2,4}>}', name: 'symsvel_languages_bo_update', methods: ['PATCH'], format: 'json')]
     public function update(Request $request, string $code): JsonResponse
     {
