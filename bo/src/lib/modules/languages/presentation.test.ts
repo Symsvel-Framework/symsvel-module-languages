@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { languageCopy, filterLanguages, type BoLanguage } from './presentation';
+import { languageCopy, translationCopy, filterLanguages, type BoLanguage } from './presentation';
 import { boNavigation } from './navigation';
 
 const rows: BoLanguage[] = [
@@ -16,6 +16,11 @@ describe('Languages BO', () => {
   it('keeps all statuses and primary protection metadata', () => {
     expect(rows[1].primary).toBe(true);
     expect(rows[2].pre_open).toBe(true);
+  });
+  it('provides translated labels for the dictionary editor', () => {
+    expect(languageCopy('fr').translations).toBe('Traductions');
+    expect(translationCopy('en-US').export).toBe('Generate .ts file');
+    expect(translationCopy('es').title).toBe('Traductions');
   });
   it('filters, sorts and localizes', () => {
     expect(filterLanguages(rows, 'FR', 'name', 'asc', 'fr').map(x => x.iso_code)).toEqual(['fr']);
