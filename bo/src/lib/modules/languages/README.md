@@ -19,3 +19,7 @@ de la langue principale reste côté API PHP.
 La route `/languages/translations` est générée par le même synchroniseur Svelte que `/languages` : la source du module est sous `bo/src/routes/languages/translations/+page.svelte`. Le lien depuis la page Languages conserve les ACL existantes et les appels HTTP utilisent exclusivement `boApi`.
 
 Le contrôle HTTP final est porté par `BoTranslationsController`. Le navigateur télécharge un fichier TypeScript à partir du JSON reçu de `GET /apibo/languages/translations/export`; il n'écrit ni dans les sources Svelte ni dans les répertoires du Back. La publication dans les projets et la reconstruction des composants nécessiteront une opération CLI/Tooling dédiée. Les textes d'interface de cette page ont des fallback français et anglais intégrés tant que la chaîne dynamique n'est pas raccordée.
+
+
+
+La liste BO des traductions provient du registre de clés `symsvel_translation_keys` et montre les entrées manquantes ainsi que leur fallback, sans écrire ce fallback en base. `POST /apibo/languages/translations/keys` prépare une clé vide avec une description facultative. Le format de l'export TypeScript est imbriqué (à l'identique du générateur HP étudié).
