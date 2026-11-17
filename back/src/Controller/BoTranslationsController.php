@@ -125,6 +125,16 @@ final readonly class BoTranslationsController
         }
     }
 
+    #[Route('/apibo/languages/translations/csv-capabilities', name: 'symsvel_languages_translations_csv_capabilities', methods: ['GET'], format: 'json')]
+    public function csvCapabilities(Request $request): JsonResponse
+    {
+        if (($error = $this->authorize($request, 'manage')) !== null) return $error;
+        return self::reply(['data' => [
+            'can_export' => true,
+            'can_import' => in_array($this->environment, ['dev', 'test'], true),
+        ]]);
+    }
+
     /** Exports the entire module dictionary, including untranslated keys and disabled languages. */
     #[Route('/apibo/languages/translations/export/csv', name: 'symsvel_languages_translations_csv_export', methods: ['GET'], format: 'json')]
     public function exportCsv(Request $request): JsonResponse
