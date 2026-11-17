@@ -19,7 +19,7 @@ final class LanguagesSettingDefinitionProvider implements SettingDefinitionProvi
             required: true,
             blocking: true,
             editable: false,
-            description: 'Choisie explicitement au Setup ; elle ne peut plus être changée.',
+            description: 'Initialisée depuis la langue du navigateur au Setup ; non modifiable ensuite.',
         );
         yield new SettingDefinition(
             key: 'multilingual',
