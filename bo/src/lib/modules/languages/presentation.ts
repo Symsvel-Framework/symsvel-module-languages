@@ -8,7 +8,7 @@ export type BoLanguage = {
 export type BoLanguagesResponse = { data: BoLanguage[] };
 const copy = {
   fr: {
-    title: 'Langues', name: 'Langue', primary: 'Principale',
+    title: 'Langues', name: 'Langue', primary: 'Principale', translations: 'Traductions',
     intro: 'Activez les langues publiques ou placez-les en préouverture pour préparer leurs traductions.',
     publicState: 'Active', preOpenState: 'Préouverture',
     yes: 'Oui', no: 'Non', refresh: 'Actualiser', saved: 'Statut enregistré.',
@@ -19,7 +19,7 @@ const copy = {
     failure: 'Impossible de charger ou modifier les langues.'
   },
   en: {
-    title: 'Languages', name: 'Language', primary: 'Primary',
+    title: 'Languages', name: 'Language', primary: 'Primary', translations: 'Translations',
     intro: 'Enable public languages or put them in pre-opening to prepare translations.',
     publicState: 'Active', preOpenState: 'Pre-opening',
     yes: 'Yes', no: 'No', refresh: 'Refresh', saved: 'Status saved.',
