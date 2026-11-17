@@ -20,23 +20,79 @@ final readonly class TranslationCatalog
     ) {
     }
 
-    /** @return list<array{scope:string,translation_key:string,language:string,value:string}> */
+    /**
+     * Full key inventory, including entries missing in the selected locale.
+     * The BO can display the French/site fallback without silently saving it.
+     *
+     * @return list<array{scope:string,translation_key:string,description:?string,language:string,value:string,fallback_value:string,missing_translation:bool}>
+     */
     public function entries(string $scope, string $language): array
     {
         $this->validateScope($scope);
         $this->validateLanguage($language);
-
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT scope, translation_key, language, text_value FROM symsvel_translations '
-            .'WHERE scope = ? AND language = ? ORDER BY translation_key',
-            [$scope, $language],
+        $keys = $this->db->fetchAllAssociative(
+            'SELECT scope, translation_key, description FROM symsvel_translation_keys '
+            .'WHERE scope = ? ORDER BY translation_key',
+            [$scope],
         );
-        return array_map(static fn (array $row): array => [
-            'scope' => (string) $row['scope'],
-            'translation_key' => (string) $row['translation_key'],
-            'language' => (string) $row['language'],
-            'value' => (string) $row['text_value'],
-        ], $rows);
+        $primary = $this->settings->get('languages.primary_language');
+        if (!is_string($primary) || $primary === '') {
+            throw new \DomainException('Primary language is not initialized.');
+        }
+        $texts = $this->db->fetchAllAssociative(
+            'SELECT translation_key, language, text_value FROM symsvel_translations '
+            .'WHERE scope = ? AND language IN (?, ?, ?)',
+            [$scope, $language, 'fr', $primary],
+        );
+        $byKey = [];
+        foreach ($texts as $text) {
+            $byKey[(string) $text['translation_key']][(string) $text['language']] = (string) $text['text_value'];
+        }
+        $entries = [];
+        foreach ($keys as $key) {
+            $name = (string) $key['translation_key'];
+            $values = $byKey[$name] ?? [];
+            $translated = (string) ($values[$language] ?? '');
+            $fallback = (string) ($values['fr'] ?? '');
+            if (trim($fallback) === '') $fallback = (string) ($values[$primary] ?? '');
+            $entries[] = [
+                'scope' => $scope,
+                'translation_key' => $name,
+                'description' => $key['description'] === null ? null : (string) $key['description'],
+                'language' => $language,
+                'value' => $translated,
+                'fallback_value' => $fallback,
+                'missing_translation' => trim($translated) === '',
+            ];
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Register a durable translation key independently of its translated texts.
+     *
+     * @return array{scope:string,translation_key:string,description:?string}
+     */
+    public function registerKey(string $scope, string $key, ?string $description = null): array
+    {
+        $this->validateScope($scope);
+        self::validateKey($key);
+        if ($description !== null && (strlen($description) > 4096 || str_contains($description, "\\0"))) {
+            throw new \InvalidArgumentException('Invalid translation description.');
+        }
+        $this->db->transactional(function () use ($scope, $key, $description): void {
+            if ($this->db->fetchOne(
+                'SELECT 1 FROM symsvel_translation_keys WHERE scope = ? AND translation_key = ?',
+                [$scope, $key],
+            ) !== false) {
+                throw new \DomainException('Translation key already registered.');
+            }
+            $this->db->insert('symsvel_translation_keys', [
+                'scope' => $scope, 'translation_key' => $key, 'description' => $description,
+            ]);
+        });
+        return ['scope' => $scope, 'translation_key' => $key, 'description' => $description];
     }
 
     /** @return array{scope:string,translation_key:string,language:string,value:string} */
@@ -50,6 +106,15 @@ final readonly class TranslationCatalog
         }
 
         $this->db->transactional(function () use ($scope, $language, $key, $value): void {
+            // Keep source keys when translated values are subsequently removed.
+            if ($this->db->fetchOne(
+                'SELECT 1 FROM symsvel_translation_keys WHERE scope = ? AND translation_key = ?',
+                [$scope, $key],
+            ) === false) {
+                $this->db->insert('symsvel_translation_keys', [
+                    'scope' => $scope, 'translation_key' => $key, 'description' => null,
+                ]);
+            }
             $updated = $this->db->update('symsvel_translations', ['text_value' => $value], [
                 'scope' => $scope, 'translation_key' => $key, 'language' => $language,
             ]);
