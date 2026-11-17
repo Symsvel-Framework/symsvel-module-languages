@@ -46,18 +46,18 @@ final readonly class LanguageCatalog
         $primary = $this->settings->get('languages.primary_language');
         $active = $this->activeForAccounts();
         if (!is_string($primary) || $primary === '' || $active === []) {
-            throw new \\DomainException('Site language is not initialized.');
+            throw new \DomainException('Site language is not initialized.');
         }
         $codes = array_column($active, 'iso_code');
         if (!in_array($primary, $codes, true)) {
-            throw new \\DomainException('Site primary language is not active.');
+            throw new \DomainException('Site primary language is not active.');
         }
         if (count($active) === 1) {
             return $primary;
         }
         $code = $candidate === null ? $primary : strtolower(trim($candidate));
         if (!preg_match('/^[a-z]{2,4}$/D', $code) || !in_array($code, $codes, true)) {
-            throw new \\InvalidArgumentException('Language must be active.');
+            throw new \InvalidArgumentException('Language must be active.');
         }
         return $code;
     }
