@@ -129,11 +129,13 @@ final readonly class BoTranslationsController
     #[Route('/apibo/languages/translations/csv-capabilities', name: 'symsvel_languages_translations_csv_capabilities', methods: ['GET'], format: 'json')]
     public function csvCapabilities(Request $request): JsonResponse
     {
-        if (($error = $this->authorize($request, 'manage')) !== null) return $error;
+        if (($error = $this->authorize($request, 'list')) !== null) return $error;
+        $canManage = $this->gate->check($request, 'languages', 'manage')->allowed();
         return self::reply(['data' => [
-            'can_export' => true,
-            'can_import' => in_array($this->environment, ['dev', 'test'], true) && $this->isLocal($request),
-            'can_publish' => $this->environment === 'dev' && $this->isLocal($request)
+            'can_export' => $canManage,
+            'can_import' => $canManage && in_array($this->environment, ['dev', 'test'], true)
+                && $this->isLocal($request),
+            'can_publish' => $canManage && $this->environment === 'dev' && $this->isLocal($request)
                 && class_exists(\SymSvel\Tooling\I18n\TranslationFilePublisher::class),
         ]]);
     }
