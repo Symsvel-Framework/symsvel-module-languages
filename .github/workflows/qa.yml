@@ -40,13 +40,20 @@ jobs:
           cache-dependency-path: assembled-bo/package-lock.json
       - name: Assemble languages routes like Tooling
         run: |
-          mkdir -p assembled-bo/src/lib/modules/languages/routes/languages
-          mkdir -p assembled-bo/src/routes/languages
+          mkdir -p assembled-bo/src/lib/modules/languages/routes/languages/translations
+          mkdir -p assembled-bo/src/routes/languages/translations
           cp bo/src/lib/modules/languages/*.ts assembled-bo/src/lib/modules/languages/
           cp bo/src/routes/languages/+page.svelte assembled-bo/src/lib/modules/languages/routes/languages/+page.svelte
+          cp bo/src/routes/languages/translations/+page.svelte assembled-bo/src/lib/modules/languages/routes/languages/translations/+page.svelte
           cat > assembled-bo/src/routes/languages/+page.svelte <<'ROUTE'
           <script lang="ts">
             import ModulePage from '#lib/modules/languages/routes/languages/+page.svelte';
+          </script>
+          <ModulePage />
+          ROUTE
+          cat > assembled-bo/src/routes/languages/translations/+page.svelte <<'ROUTE'
+          <script lang="ts">
+            import ModulePage from '#lib/modules/languages/routes/languages/translations/+page.svelte';
           </script>
           <ModulePage />
           ROUTE
