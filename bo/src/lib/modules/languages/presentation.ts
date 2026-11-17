@@ -55,7 +55,7 @@ const translationLabels = {
   fr: {
     title: 'Traductions', intro: 'Éditez les textes par interface et par langue.',
     scope: 'Interface', language: 'Langue', editor: 'Éditeur', key: 'Clé',
-    value: 'Traduction', export: 'Générer le fichier .ts', exportHint: 'Télécharge le dictionnaire TypeScript. La publication et la compilation restent à effectuer via Tooling.',
+    value: 'Traduction', description: 'Description de la clé', status: 'État', missing: 'manquantes', complete: 'Traduite', fallback: 'texte de secours', createKey: 'Créer la clé', keyCreated: 'Clé créée.', export: 'Générer le fichier .ts', exportHint: 'Télécharge le dictionnaire TypeScript. La publication et la compilation restent à effectuer via Tooling.',
     entries: 'Traductions enregistrées', empty: 'Aucune traduction dans cette langue.',
     save: 'Enregistrer', saved: 'Traduction enregistrée.', clear: 'Effacer le formulaire',
     delete: 'Supprimer', deleted: 'Traduction supprimée.', edit: 'Éditer',
@@ -67,7 +67,7 @@ const translationLabels = {
   en: {
     title: 'Translations', intro: 'Edit text by interface and language.',
     scope: 'Interface', language: 'Language', editor: 'Editor', key: 'Key',
-    value: 'Translation', export: 'Generate .ts file', exportHint: 'Downloads the TypeScript dictionary. Publishing and building remain tooling operations.',
+    value: 'Translation', description: 'Key description', status: 'Status', missing: 'missing', complete: 'Translated', fallback: 'fallback text', createKey: 'Create key', keyCreated: 'Key created.', export: 'Generate .ts file', exportHint: 'Downloads the TypeScript dictionary. Publishing and building remain tooling operations.',
     entries: 'Saved translations', empty: 'No translations for this language.',
     save: 'Save', saved: 'Translation saved.', clear: 'Clear form',
     delete: 'Delete', deleted: 'Translation deleted.', edit: 'Edit',
