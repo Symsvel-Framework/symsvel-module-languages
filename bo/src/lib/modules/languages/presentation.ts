@@ -32,7 +32,7 @@ const copy = {
 };
 export type LanguageCopy = (typeof copy)['fr'];
 export function languageCopy(locale: string | null): LanguageCopy {
-  return locale?.toLowerCase().split('-')[0] === 'fr' ? copy.fr : copy.en;
+  return locale?.toLowerCase().split('-')[0] === 'en' ? copy.en : copy.fr;
 }
 export function filterLanguages(
   rows: BoLanguage[],
