@@ -119,3 +119,9 @@ Les modules Admins et Users enregistrent la langue de leur compte dans leur prop
 **Séparation au Setup :** la langue du premier administrateur est déduite de la langue du navigateur sans requêter le catalogue avant la création des données. Ce code individuel ne doit pas être assimilé à la langue principale du site. L'initialisation globale reste à vérifier au CT ; elle ne doit pas être implicitement déclenchée par un écran de création de compte.
 
 Tests : le catalogue est vérifié pour une langue active, deux langues actives, une langue préouverte et le rejet des codes inconnus. CI et CT multi-SGBD restent nécessaires.
+
+## Initialisation automatique et repli des traductions (17/11/2026)
+
+À la phase 2 du Setup, après la compilation/exécution des migrations, la préférence `Accept-Language` du navigateur est réduite au code ISO de langue. Si l'en-tête n'est pas exploitable, le repli initial est `fr`. Le Setup transmet ce code à `symsvel:languages:bootstrap:stdin` avant la création du compte `ROLE_DEV`. Languages active la langue principale et la conserve dans Settings de façon idempotente ; aucune lecture de ses tables n'est effectuée avant les migrations. Le même code ISO est transmis au bootstrap du premier administrateur.
+
+Le **fallback français pour les traductions** est une règle de rendu : lorsqu'aucun fichier de traduction ne correspond à la langue demandée, les textes proviennent du fichier français disponible. La langue ISO enregistrée pour le site ou le compte ne doit pas être remplacée par `fr` à cause de cette absence. Les clients BO/App/Front et la chaîne i18n devront vérifier cette résolution de fichiers. Les tests end-to-end et les CI restent nécessaires.
