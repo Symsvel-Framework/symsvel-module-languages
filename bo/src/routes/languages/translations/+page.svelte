@@ -40,9 +40,8 @@
   }
 
   function params(includeKey = false): string {
-    const query = new URLSearchParams({ scope, language });
-    if (includeKey) query.set('key', key);
-    return query.toString();
+    const baseParams = `scope=${encodeURIComponent(scope)}&language=${encodeURIComponent(language)}`;
+    return includeKey ? `${baseParams}&key=${encodeURIComponent(key)}` : baseParams;
   }
 
   async function loadLanguages(): Promise<void> {
