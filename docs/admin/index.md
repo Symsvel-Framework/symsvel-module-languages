@@ -41,3 +41,10 @@ Le bouton **Traductions** de la page Languages ouvre `/languages/translations`. 
 Le bouton **Générer le fichier .ts** télécharge le dictionnaire TypeScript de la sélection. Les clés absentes utilisent les textes français disponibles, puis ceux de la langue principale du site, toujours avec priorité aux textes explicitement traduits dans la langue cible. Les clés sont triées pour fournir un résultat reproductible. La permission `languages.list` permet de consulter les valeurs ; `languages.manage` est requise pour modifier, supprimer ou exporter.
 
 **Limite actuelle :** ce téléchargement ne déploie pas le fichier dans BO/App/Front et ne reconstruit pas les builds Svelte. Les libellés intégrés de certaines pages ne consomment pas encore ce dictionnaire. L'installation d'une chaîne automatique depuis l'éditeur BO jusqu'au build est un chantier Tooling distinct, non validé.
+
+
+### Clés de référence et traductions manquantes
+
+Les clés sont désormais enregistrées indépendamment de leurs valeurs par langue. Le bouton **Créer la clé** permet de préparer une clé et sa description avant qu'une traduction existe ; le bouton **Enregistrer** renseigne la traduction sélectionnée. Le tableau continue à afficher une clé après suppression de son texte et indique si elle est **manquante**. Un texte de secours français ou de langue principale peut être affiché sans être enregistré à la place de la traduction absente.
+
+L'export `.ts` télécharge des objets imbriqués par catégories de clés, au format de l'export HP. Le déploiement dans l'application nécessite encore une opération Tooling distincte.
