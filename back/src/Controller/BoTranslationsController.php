@@ -35,6 +35,32 @@ final readonly class BoTranslationsController
         }
     }
 
+    #[Route('/apibo/languages/translations/keys', name: 'symsvel_languages_translations_key_create', methods: ['POST'], format: 'json')]
+    public function createKey(Request $request): JsonResponse
+    {
+        if (($error = $this->authorize($request, 'manage')) !== null) return $error;
+        if (!str_starts_with(strtolower($request->headers->get('Content-Type', '')), 'application/json')
+            || strlen($request->getContent()) > 6000) return self::error(400);
+        try {
+            $data = json_decode($request->getContent(), true, 4, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return self::error(400);
+        }
+        if (!is_array($data) || array_is_list($data)
+            || !is_string($data['scope'] ?? null) || !is_string($data['key'] ?? null)
+            || (array_key_exists('description', $data) && !is_string($data['description']) && $data['description'] !== null)
+            || count($data) > 3 || count($data) < 2) return self::error(400);
+        try {
+            return self::reply(['data' => $this->translations->registerKey(
+                $data['scope'], $data['key'], $data['description'] ?? null,
+            )], 201);
+        } catch (\InvalidArgumentException) {
+            return self::error(400);
+        } catch (\DomainException) {
+            return self::error(409);
+        }
+    }
+
     #[Route('/apibo/languages/translations', name: 'symsvel_languages_translations_save', methods: ['PUT'], format: 'json')]
     public function save(Request $request): JsonResponse
     {
