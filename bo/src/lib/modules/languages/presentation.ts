@@ -50,3 +50,34 @@ export function filterLanguages(
         (order === 'asc' ? 1 : -1)
     );
 }
+
+const translationLabels = {
+  fr: {
+    title: 'Traductions', intro: 'Éditez les textes par interface et par langue.',
+    scope: 'Interface', language: 'Langue', editor: 'Éditeur', key: 'Clé',
+    value: 'Traduction', export: 'Générer le fichier .ts', exportHint: 'Télécharge le dictionnaire TypeScript. La publication et la compilation restent à effectuer via Tooling.',
+    entries: 'Traductions enregistrées', empty: 'Aucune traduction dans cette langue.',
+    save: 'Enregistrer', saved: 'Traduction enregistrée.', clear: 'Effacer le formulaire',
+    delete: 'Supprimer', deleted: 'Traduction supprimée.', edit: 'Éditer',
+    generated: 'Fichier TypeScript généré.', confirmDelete: 'Supprimer cette traduction ?',
+    session: 'Session expirée. Reconnectez-vous.', forbidden: 'Action interdite.',
+    invalid: 'Clé ou valeur invalide.', notAvailable: 'Langue désactivée : activez-la ou placez-la en préouverture.',
+    failure: 'Impossible de traiter les traductions.'
+  },
+  en: {
+    title: 'Translations', intro: 'Edit text by interface and language.',
+    scope: 'Interface', language: 'Language', editor: 'Editor', key: 'Key',
+    value: 'Translation', export: 'Generate .ts file', exportHint: 'Downloads the TypeScript dictionary. Publishing and building remain tooling operations.',
+    entries: 'Saved translations', empty: 'No translations for this language.',
+    save: 'Save', saved: 'Translation saved.', clear: 'Clear form',
+    delete: 'Delete', deleted: 'Translation deleted.', edit: 'Edit',
+    generated: 'TypeScript file generated.', confirmDelete: 'Delete this translation?',
+    session: 'Session expired. Please sign in.', forbidden: 'Action denied.',
+    invalid: 'Invalid key or value.', notAvailable: 'Language is disabled: activate it or place it in pre-opening.',
+    failure: 'Cannot process translations.'
+  }
+};
+export type TranslationCopy = (typeof translationLabels)['fr'];
+export function translationCopy(locale: string | null): TranslationCopy {
+  return locale?.toLowerCase().split('-')[0] === 'en' ? translationLabels.en : translationLabels.fr;
+}
