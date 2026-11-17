@@ -1,3 +1,5 @@
+import { generatedTranslation } from '../../i18n/generated-translations';
+
 export type BoLanguage = {
   iso_code: string;
   name: string;
@@ -32,7 +34,10 @@ const copy = {
 };
 export type LanguageCopy = (typeof copy)['fr'];
 export function languageCopy(locale: string | null): LanguageCopy {
-  return locale?.toLowerCase().split('-')[0] === 'en' ? copy.en : copy.fr;
+  const base = locale?.toLowerCase().split('-')[0] === 'en' ? copy.en : copy.fr;
+  return Object.fromEntries(Object.entries(base).map(([key, value]) => [
+    key, generatedTranslation(locale, `languages.${key}`) ?? value
+  ])) as LanguageCopy;
 }
 export function filterLanguages(
   rows: BoLanguage[],
@@ -95,5 +100,8 @@ const translationLabels = {
 };
 export type TranslationCopy = (typeof translationLabels)['fr'];
 export function translationCopy(locale: string | null): TranslationCopy {
-  return locale?.toLowerCase().split('-')[0] === 'en' ? translationLabels.en : translationLabels.fr;
+  const base = locale?.toLowerCase().split('-')[0] === 'en' ? translationLabels.en : translationLabels.fr;
+  return Object.fromEntries(Object.entries(base).map(([key, value]) => [
+    key, generatedTranslation(locale, `languages.translations.${key}`) ?? value
+  ])) as TranslationCopy;
 }
