@@ -77,8 +77,10 @@ final class TranslationCatalogTest extends TestCase
             $export = $translations->export('bo', 'en');
             self::assertSame('translations.bo.en.ts', $export['filename']);
             self::assertSame(2, $export['entries']);
-            self::assertStringContainsString('"auth.signIn": "Sign in"', $export['content']);
-            self::assertStringContainsString('"navigation.home": "Accueil"', $export['content']);
+            self::assertStringContainsString('"auth": {', $export['content']);
+            self::assertStringContainsString('"signIn": "Sign in"', $export['content']);
+            self::assertStringContainsString('"navigation": {', $export['content']);
+            self::assertStringContainsString('"home": "Accueil"', $export['content']);
             self::assertStringNotContainsString('Espace client', $export['content']);
             self::assertSame($export['content'], $translations->export('bo', 'en')['content']);
 
