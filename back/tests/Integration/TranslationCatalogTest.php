@@ -45,6 +45,10 @@ final class TranslationCatalogTest extends TestCase
         $migration = (new \ReflectionClass(\DoctrineMigrations\Version20261117000003::class))
             ->newInstanceWithoutConstructor();
         $migration->up($schema);
+        require_once dirname(__DIR__, 2).'/../Migration/Version20261117000004.php';
+        $keysMigration = (new \ReflectionClass(\DoctrineMigrations\Version20261117000004::class))
+            ->newInstanceWithoutConstructor();
+        $keysMigration->up($schema);
         foreach ($schema->toSql($db->getDatabasePlatform()) as $sql) $db->executeStatement($sql);
         foreach (['fr', 'en', 'de'] as $code) {
             $db->insert('symsvel_languages', [
@@ -72,7 +76,9 @@ final class TranslationCatalogTest extends TestCase
             $translations->save('bo', 'fr', 'navigation.home', 'Accueil');
             $translations->save('bo', 'en', 'auth.signIn', 'Sign in');
             $translations->save('app', 'fr', 'auth.signIn', 'Espace client');
-            self::assertCount(1, $translations->entries('bo', 'en'));
+            self::assertCount(2, $translations->entries('bo', 'en'));
+            self::assertTrue($translations->entries('bo', 'en')[1]['missing_translation']);
+            self::assertSame('Accueil', $translations->entries('bo', 'en')[1]['fallback_value']);
             self::assertCount(2, $translations->entries('bo', 'fr'));
             $export = $translations->export('bo', 'en');
             self::assertSame('translations.bo.en.ts', $export['filename']);
@@ -87,12 +93,33 @@ final class TranslationCatalogTest extends TestCase
             $translations->save('bo', 'en', 'auth.signIn', 'Log in');
             self::assertSame('Log in', $translations->entries('bo', 'en')[0]['value']);
             $translations->delete('bo', 'en', 'auth.signIn');
-            self::assertSame([], $translations->entries('bo', 'en'));
+            self::assertCount(2, $translations->entries('bo', 'en'));
+            self::assertSame('', $translations->entries('bo', 'en')[0]['value']);
+            self::assertTrue($translations->entries('bo', 'en')[0]['missing_translation']);
             self::assertStringContainsString('Connexion', $translations->export('bo', 'en')['content']);
 
             $languages->update('en', false, false);
             $this->expectException(\DomainException::class);
             $translations->export('bo', 'en');
+        } finally {
+            $db->close();
+        }
+    }
+
+    public function testKeyExistsBeforeAnyTranslationIsSaved(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $translations->registerKey('app', 'account.confirm', 'Account confirmation');
+            $rows = $translations->entries('app', 'fr');
+            self::assertCount(1, $rows);
+            self::assertSame('account.confirm', $rows[0]['translation_key']);
+            self::assertSame('Account confirmation', $rows[0]['description']);
+            self::assertTrue($rows[0]['missing_translation']);
+            self::assertSame('', $rows[0]['fallback_value']);
+
+            $this->expectException(\DomainException::class);
+            $translations->registerKey('app', 'account.confirm');
         } finally {
             $db->close();
         }
