@@ -26,11 +26,17 @@ final readonly class TranslationCatalog
         $this->validateScope($scope);
         $this->validateLanguage($language);
 
-        return $this->db->fetchAllAssociative(
-            'SELECT scope, translation_key, language, value FROM symsvel_translations '
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT scope, translation_key, language, text_value FROM symsvel_translations '
             .'WHERE scope = ? AND language = ? ORDER BY translation_key',
             [$scope, $language],
         );
+        return array_map(static fn (array $row): array => [
+            'scope' => (string) $row['scope'],
+            'translation_key' => (string) $row['translation_key'],
+            'language' => (string) $row['language'],
+            'value' => (string) $row['text_value'],
+        ], $rows);
     }
 
     /** @return array{scope:string,translation_key:string,language:string,value:string} */
@@ -44,7 +50,7 @@ final readonly class TranslationCatalog
         }
 
         $this->db->transactional(function () use ($scope, $language, $key, $value): void {
-            $updated = $this->db->update('symsvel_translations', ['value' => $value], [
+            $updated = $this->db->update('symsvel_translations', ['text_value' => $value], [
                 'scope' => $scope, 'translation_key' => $key, 'language' => $language,
             ]);
             if ($updated === 0 && !$this->db->fetchOne(
@@ -52,7 +58,7 @@ final readonly class TranslationCatalog
                 [$scope, $key, $language],
             )) {
                 $this->db->insert('symsvel_translations', [
-                    'scope' => $scope, 'translation_key' => $key, 'language' => $language, 'value' => $value,
+                    'scope' => $scope, 'translation_key' => $key, 'language' => $language, 'text_value' => $value,
                 ]);
             }
         });
@@ -86,12 +92,12 @@ final readonly class TranslationCatalog
         $values = [];
         foreach (array_unique(['fr', $primary, $language]) as $code) {
             $rows = $this->db->fetchAllAssociative(
-                'SELECT translation_key, value FROM symsvel_translations WHERE scope = ? AND language = ? '
+                'SELECT translation_key, text_value FROM symsvel_translations WHERE scope = ? AND language = ? '
                 .'ORDER BY translation_key',
                 [$scope, $code],
             );
             foreach ($rows as $row) {
-                $values[(string) $row['translation_key']] = (string) $row['value'];
+                $values[(string) $row['translation_key']] = (string) $row['text_value'];
             }
         }
         ksort($values, SORT_STRING);
