@@ -103,7 +103,10 @@
 <div class="languages-page">
   <header class="page-heading">
     <div><h1>{t.title}</h1><p>{t.intro}</p></div>
-    <Button type="button" variant="secondary" onclick={load} disabled={loading}>{t.refresh}</Button>
+    <div class="header-actions">
+      <Button type="button" onclick={() => goto(resolve('/languages/translations'))}>{t.translations}</Button>
+      <Button type="button" variant="secondary" onclick={load} disabled={loading}>{t.refresh}</Button>
+    </div>
   </header>
   {#if error}<Alert kind="error">{error}</Alert>{/if}
   {#if notice}<Alert kind="success">{notice}</Alert>{/if}
@@ -127,6 +130,7 @@
   .languages-page { max-width: 1200px; margin: auto; display: grid; gap: 20px; }
   .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
   .page-heading h1 { margin: 0; }
+  .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
   .page-heading p { color: #667085; }
   .panel { padding: 24px; background: white; border: 1px solid #e2e7ee; border-radius: 14px; min-width: 0; }
 </style>
