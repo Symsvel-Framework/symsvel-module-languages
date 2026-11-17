@@ -112,6 +112,7 @@ Les modules Admins et Users enregistrent la langue de leur compte dans leur prop
 - Une seule langue `active=true` : la langue principale du site est imposée, même si une autre valeur est envoyée par un client ; aucune liste de sélection ne doit être affichée.
 - Plusieurs langues actives : seuls leurs codes ISO sont acceptés ; si aucune préférence n'est donnée, la langue principale est utilisée.
 - `pre_open=true` ne rend **pas** une langue sélectionnable pour les comptes tant qu'elle n'est pas également active.
+- `GET /apiopen/languages/account-options` fournit les codes actifs pour l'inscription App, indépendamment du mode multilingue de l'interface.
 - `GET /apibo/languages/account-options` renvoie les choix actifs aux acteurs BO autorisés à consulter Languages ou à créer/modifier Admins ou Users. Il reste protégé par `BoAccessGate`.
 - Les valeurs nulles d'anciens comptes signifient « pas de préférence enregistrée » et sont interprétées côté consommateur via le repli du site ; elles ne créent aucune association SQL.
 
