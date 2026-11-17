@@ -133,6 +133,26 @@ final class LanguageCatalogTest extends TestCase
         }
     }
 
+    public function testAccountLanguageUsesPrimaryWhenOnlyOneLanguageIsActive(): void
+    {
+        [$catalog, , $db] = $this->services();
+        try {
+            $catalog->initializePrimary('fr');
+            self::assertCount(1, $catalog->activeForAccounts());
+            self::assertSame('fr', $catalog->resolveAccountLanguage('de'));
+            $catalog->update('de', false, true);
+            self::assertCount(1, $catalog->activeForAccounts());
+            $catalog->update('de', true, false);
+            self::assertCount(2, $catalog->activeForAccounts());
+            self::assertSame('de', $catalog->resolveAccountLanguage('DE'));
+            self::assertSame('fr', $catalog->resolveAccountLanguage(null));
+            $this->expectException(\InvalidArgumentException::class);
+            $catalog->resolveAccountLanguage('zz');
+        } finally {
+            $db->close();
+        }
+    }
+
     public function testUnknownCodesCannotBeSelectedOrUpdated(): void
     {
         [$catalog, , $db] = $this->services();
