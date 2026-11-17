@@ -71,18 +71,25 @@ final readonly class TranslationCsvTransfer
                 'texts_created' => 0, 'texts_updated' => 0, 'unchanged' => 0,
                 'sha256' => $digest, 'applied' => $apply,
             ];
+            $keyCache = [];
+            $textCache = [];
             foreach ($rows as $row) {
                 [$scope, $key, $description, $language, $value] = $row;
                 if ($language !== '' && !isset($languages[$language])) {
                     throw new \InvalidArgumentException('Unknown language code: '.$language);
                 }
-                $existing = $this->db->fetchAssociative(
-                    'SELECT description FROM symsvel_translation_keys WHERE scope = ? AND translation_key = ?',
-                    [$scope, $key],
-                );
+                $keyId = $scope."\0".$key;
+                if (!array_key_exists($keyId, $keyCache)) {
+                    $keyCache[$keyId] = $this->db->fetchAssociative(
+                        'SELECT description FROM symsvel_translation_keys WHERE scope = ? AND translation_key = ?',
+                        [$scope, $key],
+                    );
+                }
+                $existing = $keyCache[$keyId];
                 $changed = false;
                 if ($existing === false) {
                     ++$summary['keys_created'];
+                    $keyCache[$keyId] = ['description' => $description !== '' ? $description : null];
                     $changed = true;
                     if ($apply) $this->db->insert('symsvel_translation_keys', [
                         'scope' => $scope, 'translation_key' => $key,
@@ -90,6 +97,7 @@ final readonly class TranslationCsvTransfer
                     ]);
                 } elseif ($description !== '' && $description !== (string) ($existing['description'] ?? '')) {
                     ++$summary['keys_updated'];
+                    $keyCache[$keyId] = ['description' => $description];
                     $changed = true;
                     if ($apply) $this->db->update('symsvel_translation_keys',
                         ['description' => $description], ['scope' => $scope, 'translation_key' => $key]);
@@ -97,13 +105,18 @@ final readonly class TranslationCsvTransfer
                 // Empty cells preserve local translations. Use the BO deletion action
                 // when deletion is intentional, rather than importing an ambiguous blank.
                 if ($language !== '' && $value !== '') {
-                    $current = $this->db->fetchOne(
-                        'SELECT text_value FROM symsvel_translations '
-                        .'WHERE scope = ? AND translation_key = ? AND language = ?',
-                        [$scope, $key, $language],
-                    );
+                    $textId = $keyId."\0".$language;
+                    if (!array_key_exists($textId, $textCache)) {
+                        $textCache[$textId] = $this->db->fetchOne(
+                            'SELECT text_value FROM symsvel_translations '
+                            .'WHERE scope = ? AND translation_key = ? AND language = ?',
+                            [$scope, $key, $language],
+                        );
+                    }
+                    $current = $textCache[$textId];
                     if ($current === false) {
                         ++$summary['texts_created'];
+                        $textCache[$textId] = $value;
                         $changed = true;
                         if ($apply) $this->db->insert('symsvel_translations', [
                             'scope' => $scope, 'translation_key' => $key,
@@ -111,6 +124,7 @@ final readonly class TranslationCsvTransfer
                         ]);
                     } elseif ((string) $current !== $value) {
                         ++$summary['texts_updated'];
+                        $textCache[$textId] = $value;
                         $changed = true;
                         if ($apply) $this->db->update('symsvel_translations', ['text_value' => $value], [
                             'scope' => $scope, 'translation_key' => $key, 'language' => $language,
