@@ -9,7 +9,10 @@
   import { uiLanguage } from '../../../../../api/locales';
   import { languageCopy, translationCopy, type BoLanguage } from '../../../presentation';
 
-  type Translation = { scope: string; translation_key: string; language: string; value: string };
+  type Translation = {
+    scope: string; translation_key: string; language: string; value: string;
+    description: string | null; fallback_value: string; missing_translation: boolean;
+  };
   type TsExport = { filename: string; content: string; entries: number };
 
   const locale = $derived($uiLanguage ?? (typeof navigator === 'undefined' ? 'fr' : navigator.language));
@@ -22,6 +25,8 @@
   let entries = $state<Translation[]>([]);
   let key = $state('');
   let value = $state('');
+  let description = $state('');
+  const missing = $derived(entries.filter((entry) => entry.missing_translation).length);
   let busy = $state(false);
   let error = $state('');
   let success = $state('');
@@ -76,7 +81,27 @@
   function edit(entry: Translation): void {
     key = entry.translation_key;
     value = entry.value;
+    description = entry.description ?? '';
     success = '';
+  }
+
+  async function createKey(): Promise<void> {
+    if (!key.trim() || busy || !language) return;
+    busy = true;
+    error = '';
+    success = '';
+    try {
+      await boApi(`${base}/keys`, {
+        method: 'POST',
+        body: JSON.stringify({ scope, key: key.trim(), description: description.trim() || null })
+      });
+      await loadEntries();
+      success = t.keyCreated;
+    } catch (cause) {
+      error = explain(cause);
+    } finally {
+      busy = false;
+    }
   }
 
   async function save(): Promise<void> {
@@ -106,6 +131,7 @@
       await boApi(`${base}?${params(true)}`, { method: 'DELETE' });
       key = '';
       value = '';
+      description = '';
       await loadEntries();
       success = t.deleted;
     } catch (cause) {
@@ -173,26 +199,29 @@
     <h2>{t.editor}</h2>
     <form onsubmit={(event) => { event.preventDefault(); void save(); }}>
       <label>{t.key}<input bind:value={key} required maxlength="190" placeholder="auth.signIn" /></label>
+      <label>{t.description}<input bind:value={description} maxlength="4096" /></label>
       <label>{t.value}<textarea bind:value={value} maxlength="8192" rows="3"></textarea></label>
       <div class="actions">
         <Button type="submit" disabled={busy || !language || !key.trim()}>{t.save}</Button>
-        <Button type="button" variant="secondary" onclick={() => { key = ''; value = ''; }}>{t.clear}</Button>
+        <Button type="button" variant="secondary" onclick={createKey} disabled={busy || !language || !key.trim()}>{t.createKey}</Button>
+        <Button type="button" variant="secondary" onclick={() => { key = ''; value = ''; description = ''; }}>{t.clear}</Button>
         <Button type="button" variant="secondary" onclick={remove} disabled={busy || !language || !key}>{t.delete}</Button>
       </div>
     </form>
   </section>
   <section class="panel">
-    <h2>{t.entries} ({entries.length})</h2>
+    <h2>{t.entries} ({entries.length}, {missing} {t.missing})</h2>
     {#if entries.length === 0}
       <p>{t.empty}</p>
     {:else}
       <div class="table-wrap"><table>
-        <thead><tr><th>{t.key}</th><th>{t.value}</th><th></th></tr></thead>
+        <thead><tr><th>{t.key}</th><th>{t.value}</th><th>{t.status}</th><th></th></tr></thead>
         <tbody>
           {#each entries as entry (entry.translation_key)}
             <tr>
               <td><code>{entry.translation_key}</code></td>
-              <td>{entry.value}</td>
+              <td>{entry.value || entry.fallback_value || '—'}{#if entry.missing_translation && entry.fallback_value} <span class="fallback">({t.fallback})</span>{/if}</td>
+              <td>{entry.missing_translation ? t.missing : t.complete}</td>
               <td><Button type="button" variant="secondary" onclick={() => edit(entry)}>{t.edit}</Button></td>
             </tr>
           {/each}
@@ -217,5 +246,6 @@
   table { width: 100%; border-collapse: collapse; }
   th, td { text-align: left; border-bottom: 1px solid #e2e7ee; padding: 10px; }
   td { overflow-wrap: anywhere; }
+  .fallback { color: #667085; font-size: 0.85em; }
   @media (max-width: 650px) { .selectors { display: grid; } }
 </style>
