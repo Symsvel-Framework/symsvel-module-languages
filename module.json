@@ -6,7 +6,8 @@
         "acls": "*"
     },
     "tables": [
-        "symsvel_languages"
+        "symsvel_languages",
+        "symsvel_translations"
     ],
     "components": {
         "back": "back",
