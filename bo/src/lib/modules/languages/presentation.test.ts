@@ -22,5 +22,6 @@ describe('Languages BO', () => {
     expect(filterLanguages(rows, '', 'name', 'asc', 'fr').map(x => x.iso_code)).toEqual(['de','en','fr']);
     expect(languageCopy('fr-FR').primaryProtected).toContain('principale');
     expect(languageCopy('en-US').primary).toBe('Primary');
+    expect(languageCopy('es-ES').primary).toBe('Principale');
   });
 });
