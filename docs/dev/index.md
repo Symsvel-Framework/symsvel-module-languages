@@ -155,3 +155,14 @@ Audit direct des archives utilisateur `src back HP.zip` et `bo HP.zip` :
 - Les archives transmises **ne contiennent pas de commande de scan automatique des fichiers TypeScript, de réécriture du projet ni de rebuild périodique**. Ces mécanismes envisagés dans SymSvel ne peuvent pas être considérés comme un portage déjà vérifié depuis HP.
 
 En conséquence, l'export SymSvel reconstruit désormais des objets TypeScript imbriqués avec tri stable et fallback à la clé. Les valeurs vides n'écrasent pas un fallback existant. L'éditeur simple actuel ne reprend **pas encore** le registre de clés séparé, les descriptions localisées, les indicateurs de traductions manquantes ou l'import CSV ; cela demeure explicitement un écart fonctionnel, non une fonctionnalité terminée. Aucun mécanisme de déploiement des sources Svelte ou d'invalidation de cache runtime n'est revendiqué. Le crash-test utilisateur reste obligatoire.
+
+
+## Registre des clés indépendante des textes (17/11/2026)
+
+Après comparaison avec les archives HP, une deuxième migration additive `Version20261117000004`, réservée dans `symsvel-tooling/docs/modules/migration-versions.json`, crée `symsvel_translation_keys` (clé composite `scope, translation_key`, description optionnelle). L'ensemble des tables reste déclaré dans `module.json`.
+
+L'API BO permet désormais `POST /apibo/languages/translations/keys` avec JSON `{scope,key,description?}` et permission `languages.manage`. Une clé existe indépendamment des textes enregistrés ; supprimer une traduction de langue ne supprime donc pas la clé. `TranslationCatalog::save()` enregistre aussi automatiquement une clé auparavant inconnue, sans désolidariser la création et l'enregistrement du texte (même transaction DBAL).
+
+`GET /apibo/languages/translations` est un catalogue **complet des clés** du scope : chaque réponse contient le texte réel de la langue cible, `description`, `fallback_value` (français puis langue principale du site) et `missing_translation`. Le fallback est purement affiché, jamais persisté comme traduction cible. L'éditeur indique le nombre de clés manquantes, propose les valeurs de secours et permet une création de clé sans texte. Les versions `20261117000003` et `20261117000004` doivent être compilées dans cet ordre, avec CT multi-SGBD ; le catalogue rétroactif de clés issues d'éventuelles traductions enregistrées avant cette deuxième migration reste à traiter si une telle installation existe.
+
+L'export TypeScript utilise l'arbre imbriqué `auth.signIn` → `{auth:{signIn:...}}` documenté dans HP, ordonne les clés à chaque niveau et ignore les textes vides en faveur des valeurs de secours. L'export d'un scope sans contenu est un objet vide `{}`, non un tableau. Aucun scan automatique des sources TypeScript et aucune publication automatique dans Svelte ne sont implémentés.
