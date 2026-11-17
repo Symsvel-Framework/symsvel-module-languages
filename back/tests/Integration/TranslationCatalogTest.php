@@ -137,7 +137,7 @@ final class TranslationCatalogTest extends TestCase
             $export = $csv->export();
             self::assertSame(3, $export['rows']);
             self::assertStringContainsString('scope,key,description,language,value', $export['content']);
-            self::assertStringContainsString('app,profile.title,Profile heading,,', $export['content']);
+            self::assertStringContainsString('app,profile.title,"Profile heading",,', $export['content']);
 
             $incoming = "scope,key,description,language,value\n"
                 ."bo,auth.signIn,,en,Log in\n"
