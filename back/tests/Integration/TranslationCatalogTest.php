@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
 use SymSvel\Module\Languages\Service\LanguageCatalog;
 use SymSvel\Module\Languages\Service\LanguagesSettingDefinitionProvider;
 use SymSvel\Module\Languages\Service\TranslationCatalog;
+use SymSvel\Module\Languages\Service\TranslationCsvTransfer;
 use SymSvel\Module\Settings\Entity\Setting;
 use SymSvel\Module\Settings\Repository\SettingRepository;
 use SymSvel\Module\Settings\Service\SettingKeyQualifier;
@@ -120,6 +121,67 @@ final class TranslationCatalogTest extends TestCase
 
             $this->expectException(\DomainException::class);
             $translations->registerKey('app', 'account.confirm');
+        } finally {
+            $db->close();
+        }
+    }
+
+    public function testCsvPreviewApplyAndNonDestructiveRoundTrip(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $csv = new TranslationCsvTransfer($db);
+            $translations->save('bo', 'fr', 'auth.signIn', 'Connexion');
+            $translations->save('bo', 'en', 'auth.signIn', 'Sign in');
+            $translations->registerKey('app', 'profile.title', 'Profile heading');
+            $export = $csv->export();
+            self::assertSame(3, $export['rows']);
+            self::assertStringContainsString('scope,key,description,language,value', $export['content']);
+            self::assertStringContainsString('app,profile.title,Profile heading,,', $export['content']);
+
+            $incoming = "scope,key,description,language,value\n"
+                ."bo,auth.signIn,,en,Log in\n"
+                ."bo,auth.signIn,,fr,\n"
+                ."bo,auth.signUp,,fr,Créer un compte\n"
+                ."bo,auth.signUp,,en,Sign up\n";
+            $preview = $csv->import($incoming);
+            self::assertFalse($preview['applied']);
+            self::assertSame(0, $preview['keys_updated']);
+            self::assertSame(1, $preview['keys_created']);
+            self::assertSame(2, $preview['texts_created']);
+            self::assertSame(1, $preview['texts_updated']);
+            self::assertSame('Sign in', $translations->entries('bo', 'en')[0]['value']);
+
+            $applied = $csv->import($incoming, true, $preview['sha256']);
+            self::assertTrue($applied['applied']);
+            self::assertSame('Log in', $translations->entries('bo', 'en')[0]['value']);
+            self::assertSame('Connexion', $translations->entries('bo', 'fr')[0]['value']);
+            self::assertCount(1, $translations->entries('app', 'fr'));
+            $again = $csv->import($incoming);
+            self::assertSame(0, $again['texts_updated']);
+            self::assertSame(0, $again['texts_created']);
+        } finally {
+            $db->close();
+        }
+    }
+
+    public function testCsvRejectsDuplicateAndPreservesDatabaseOnError(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $csv = new TranslationCsvTransfer($db);
+            $translations->save('bo', 'fr', 'test.label', 'Original');
+            $incoming = "scope,key,description,language,value\n"
+                ."bo,test.label,,fr,Changed\n"
+                ."bo,test.label,,fr,Another\n";
+            try {
+                $csv->import($incoming, true, hash('sha256', $incoming));
+                self::fail('Duplicate CSV row must be rejected.');
+            } catch (\InvalidArgumentException) {
+                self::assertSame('Original', $translations->entries('bo', 'fr')[0]['value']);
+            }
+            $this->expectException(\InvalidArgumentException::class);
+            $csv->import("scope,key,description,language,value\nbo,test.label,,zz,Unknown\n");
         } finally {
             $db->close();
         }
