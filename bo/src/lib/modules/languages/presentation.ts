@@ -62,6 +62,13 @@ const translationLabels = {
     generated: 'Fichier TypeScript généré.', confirmDelete: 'Supprimer cette traduction ?',
     session: 'Session expirée. Reconnectez-vous.', forbidden: 'Action interdite.',
     invalid: 'Clé ou valeur invalide.', notAvailable: 'Langue désactivée : activez-la ou placez-la en préouverture.',
+    csvExport: 'Exporter tout en CSV', csvExported: 'Catalogue CSV exporté.',
+    csvImport: 'Importer les traductions (développement)', csvImportHint: 'Prévisualisez le CSV de production avant de l’appliquer. Les cellules vides et lignes absentes ne suppriment rien.',
+    csvFile: 'Fichier CSV', csvTooLarge: 'CSV trop volumineux (maximum 2 Mio).',
+    csvPreview: 'Prévisualiser', csvPreviewReady: 'Prévisualisation prête.',
+    csvApply: 'Importer les changements', csvImported: 'Traductions importées.',
+    csvRows: 'Lignes', csvKeysNew: 'Clés ajoutées', csvKeysUpdated: 'Descriptions mises à jour',
+    csvTextsNew: 'Textes ajoutés', csvTextsUpdated: 'Textes remplacés', csvUnchanged: 'Sans changement',
     failure: 'Impossible de traiter les traductions.'
   },
   en: {
@@ -74,6 +81,13 @@ const translationLabels = {
     generated: 'TypeScript file generated.', confirmDelete: 'Delete this translation?',
     session: 'Session expired. Please sign in.', forbidden: 'Action denied.',
     invalid: 'Invalid key or value.', notAvailable: 'Language is disabled: activate it or place it in pre-opening.',
+    csvExport: 'Export all as CSV', csvExported: 'Translation CSV exported.',
+    csvImport: 'Import translations (development)', csvImportHint: 'Preview the production CSV before applying. Blank cells and omitted rows never delete data.',
+    csvFile: 'CSV file', csvTooLarge: 'CSV too large (maximum 2 MiB).',
+    csvPreview: 'Preview', csvPreviewReady: 'Preview ready.',
+    csvApply: 'Apply changes', csvImported: 'Translations imported.',
+    csvRows: 'Rows', csvKeysNew: 'Keys created', csvKeysUpdated: 'Descriptions updated',
+    csvTextsNew: 'Texts created', csvTextsUpdated: 'Texts replaced', csvUnchanged: 'Unchanged',
     failure: 'Cannot process translations.'
   }
 };
