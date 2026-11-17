@@ -22,8 +22,8 @@ d'implémentation préserve le résultat visible en privilégiant le
 mécanisme natif existant. Des traductions métier spécifiques feront
 l'objet d'un chantier i18n indépendant.
 
-Contrats fonctionnels XCore conservés : langue principale choisie
-explicitement au Setup et non désactivable ensuite ; anglais ou français
+Contrats fonctionnels XCore conservés : langue principale du site initialisée
+par le flux local à l'étape où le catalogue est disponible, et non désactivable ensuite ; anglais ou français
 ne sont pas imposés comme langue principale ; liste publique limitée
 à la langue principale lorsque le multilinguisme est inactif ; les
 langues en `pre_open` apparaissent uniquement côté BO.
@@ -104,3 +104,17 @@ Le test d'intégration n'impose plus à tort l'ordre ISO lorsque
 `LanguageCatalog` trie les langues selon leur **libellé traduit**.
 La vérification d'appartenance trie une copie des codes avant
 comparaison. La règle métier de tri XCore reste intacte.
+
+## Langue des comptes Admins / Users (17/11/2026)
+
+Les modules Admins et Users enregistrent la langue de leur compte dans leur propre colonne `language` (code ISO alphabétique normalisé de 2 à 4 lettres, sans clé étrangère). Languages reste propriétaire de l'éligibilité et expose `LanguageCatalog::activeForAccounts()` et `resolveAccountLanguage()`.
+
+- Une seule langue `active=true` : la langue principale du site est imposée, même si une autre valeur est envoyée par un client ; aucune liste de sélection ne doit être affichée.
+- Plusieurs langues actives : seuls leurs codes ISO sont acceptés ; si aucune préférence n'est donnée, la langue principale est utilisée.
+- `pre_open=true` ne rend **pas** une langue sélectionnable pour les comptes tant qu'elle n'est pas également active.
+- `GET /apibo/languages/account-options` renvoie les choix actifs aux acteurs BO autorisés à consulter Languages ou à créer/modifier Admins ou Users. Il reste protégé par `BoAccessGate`.
+- Les valeurs nulles d'anciens comptes signifient « pas de préférence enregistrée » et sont interprétées côté consommateur via le repli du site ; elles ne créent aucune association SQL.
+
+**Séparation au Setup :** la langue du premier administrateur est déduite de la langue du navigateur sans requêter le catalogue avant la création des données. Ce code individuel ne doit pas être assimilé à la langue principale du site. L'initialisation globale reste à vérifier au CT ; elle ne doit pas être implicitement déclenchée par un écran de création de compte.
+
+Tests : le catalogue est vérifié pour une langue active, deux langues actives, une langue préouverte et le rejet des codes inconnus. CI et CT multi-SGBD restent nécessaires.
