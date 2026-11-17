@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace SymSvel\Module\Languages\Controller;
 
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use SymSvel\Module\Acls\Access\BoAccessGate;
 use SymSvel\Module\Languages\Service\TranslationCatalog;
+use SymSvel\Module\Languages\Service\TranslationCsvTransfer;
 
 /** BO only: language dictionaries are owned by Languages, never by Back/Core. */
 final readonly class BoTranslationsController
@@ -16,6 +18,8 @@ final readonly class BoTranslationsController
     public function __construct(
         private BoAccessGate $gate,
         private TranslationCatalog $translations,
+        private TranslationCsvTransfer $csv,
+        #[Autowire('%kernel.environment%')] private string $environment,
     ) {
     }
 
@@ -118,6 +122,40 @@ final readonly class BoTranslationsController
             return self::error(400);
         } catch (\DomainException) {
             return self::error(409);
+        }
+    }
+
+    /** Exports the entire module dictionary, including untranslated keys and disabled languages. */
+    #[Route('/apibo/languages/translations/export/csv', name: 'symsvel_languages_translations_csv_export', methods: ['GET'], format: 'json')]
+    public function exportCsv(Request $request): JsonResponse
+    {
+        if (($error = $this->authorize($request, 'manage')) !== null) return $error;
+        return self::reply(['data' => $this->csv->export()]);
+    }
+
+    /** Import is a development-only operation. Production may only export CSV. */
+    #[Route('/apibo/languages/translations/import/csv', name: 'symsvel_languages_translations_csv_import', methods: ['POST'], format: 'json')]
+    public function importCsv(Request $request): JsonResponse
+    {
+        if (($error = $this->authorize($request, 'manage')) !== null) return $error;
+        if (!in_array($this->environment, ['dev', 'test'], true)) return self::error(403);
+        if (!str_starts_with(strtolower($request->headers->get('Content-Type', '')), 'application/json')
+            || strlen($request->getContent()) > 2200000) return self::error(400);
+        try {
+            $data = json_decode($request->getContent(), true, 4, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return self::error(400);
+        }
+        if (!is_array($data) || array_is_list($data) || !is_string($data['csv'] ?? null)
+            || !in_array($data['mode'] ?? null, ['preview', 'apply'], true)
+            || (isset($data['sha256']) && !is_string($data['sha256']))
+            || count($data) > 3 || count($data) < 2) return self::error(400);
+        try {
+            return self::reply(['data' => $this->csv->import(
+                $data['csv'], $data['mode'] === 'apply', $data['sha256'] ?? null,
+            )]);
+        } catch (\InvalidArgumentException) {
+            return self::error(400);
         }
     }
 
