@@ -9,10 +9,12 @@ use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigura
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use SymSvel\Module\Languages\Command\BootstrapLanguageCommand;
 use SymSvel\Module\Languages\Controller\BoLanguagesController;
+use SymSvel\Module\Languages\Controller\BoTranslationsController;
 use SymSvel\Module\Languages\Controller\PublicLanguagesController;
 use SymSvel\Module\Languages\Controller\SetupLanguagesController;
 use SymSvel\Module\Languages\Permission\LanguagesPermissionProvider;
 use SymSvel\Module\Languages\Service\LanguageCatalog;
+use SymSvel\Module\Languages\Service\TranslationCatalog;
 use SymSvel\Module\Languages\Service\LanguageLocaleResolver;
 use SymSvel\Module\Languages\Service\LanguagesSettingDefinitionProvider;
 
@@ -24,10 +26,10 @@ final class LanguagesBundle extends AbstractBundle
             ->addTag('symsvel.settings.definition_provider');
         $builder->register(LanguagesPermissionProvider::class, LanguagesPermissionProvider::class)
             ->addTag('symsvel.acls.permission_provider');
-        foreach ([LanguageCatalog::class, LanguageLocaleResolver::class] as $service) {
+        foreach ([LanguageCatalog::class, LanguageLocaleResolver::class, TranslationCatalog::class] as $service) {
             $builder->register($service, $service)->setAutowired(true);
         }
-        foreach ([BoLanguagesController::class, PublicLanguagesController::class, SetupLanguagesController::class] as $controller) {
+        foreach ([BoLanguagesController::class, BoTranslationsController::class, PublicLanguagesController::class, SetupLanguagesController::class] as $controller) {
             $builder->register($controller, $controller)->setAutowired(true)
                 ->addTag('controller.service_arguments');
         }
