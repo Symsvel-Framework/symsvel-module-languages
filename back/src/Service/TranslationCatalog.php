@@ -97,11 +97,45 @@ final readonly class TranslationCatalog
                 [$scope, $code],
             );
             foreach ($rows as $row) {
-                $values[(string) $row['translation_key']] = (string) $row['text_value'];
+                $value = (string) $row['text_value'];
+                if (trim($value) !== '') {
+                    $values[(string) $row['translation_key']] = $value;
+                }
             }
         }
         ksort($values, SORT_STRING);
-        $json = json_encode($values, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+
+        // HP's TypeScript export uses a nested dictionary (auth.signIn => auth.signIn).
+        // Build it deterministically without ever executing translation content.
+        $dictionary = [];
+        foreach ($values as $key => $value) {
+            $segments = explode('.', $key);
+            $cursor = &$dictionary;
+            foreach ($segments as $index => $segment) {
+                if ($index === count($segments) - 1) {
+                    if (isset($cursor[$segment]) && is_array($cursor[$segment])) {
+                        throw new \DomainException('Conflicting translation key prefix: '.$key);
+                    }
+                    $cursor[$segment] = $value;
+                } else {
+                    if (isset($cursor[$segment]) && !is_array($cursor[$segment])) {
+                        throw new \DomainException('Conflicting translation key prefix: '.$key);
+                    }
+                    $cursor[$segment] ??= [];
+                    $cursor = &$cursor[$segment];
+                }
+            }
+            unset($cursor);
+        }
+        $sortNested = static function (array &$node) use (&$sortNested): void {
+            ksort($node, SORT_STRING);
+            foreach ($node as &$item) {
+                if (is_array($item)) $sortNested($item);
+            }
+            unset($item);
+        };
+        $sortNested($dictionary);
+        $json = json_encode($dictionary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
             | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP
             | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
         return [
