@@ -20,6 +20,7 @@ final readonly class BoTranslationsController
         private TranslationCatalog $translations,
         private TranslationCsvTransfer $csv,
         #[Autowire('%kernel.environment%')] private string $environment,
+        #[Autowire('%kernel.project_dir%')] private string $backendDir,
     ) {
     }
 
@@ -131,7 +132,9 @@ final readonly class BoTranslationsController
         if (($error = $this->authorize($request, 'manage')) !== null) return $error;
         return self::reply(['data' => [
             'can_export' => true,
-            'can_import' => in_array($this->environment, ['dev', 'test'], true),
+            'can_import' => in_array($this->environment, ['dev', 'test'], true) && $this->isLocal($request),
+            'can_publish' => $this->environment === 'dev' && $this->isLocal($request)
+                && class_exists(\SymSvel\Tooling\I18n\TranslationFilePublisher::class),
         ]]);
     }
 
@@ -144,11 +147,11 @@ final readonly class BoTranslationsController
     }
 
     /** Import is a development-only operation. Production may only export CSV. */
-    #[Route('/apibo/languages/translations/import/csv', name: 'symsvel_languages_translations_csv_import', methods: ['POST'], format: 'json')]
+    #[Route('/apibo/languages/translations/import/csv', name: 'symsvel_languages_translations_csv_import', methods: ['POST'], format: 'json', env: ['dev', 'test'])]
     public function importCsv(Request $request): JsonResponse
     {
         if (($error = $this->authorize($request, 'manage')) !== null) return $error;
-        if (!in_array($this->environment, ['dev', 'test'], true)) return self::error(403);
+        if (!in_array($this->environment, ['dev', 'test'], true) || !$this->isLocal($request)) return self::error(403);
         if (!str_starts_with(strtolower($request->headers->get('Content-Type', '')), 'application/json')
             || strlen($request->getContent()) > 2200000) return self::error(400);
         try {
@@ -167,6 +170,47 @@ final readonly class BoTranslationsController
         } catch (\InvalidArgumentException) {
             return self::error(400);
         }
+    }
+
+    /**
+     * Local-only source publication. The module renders; Tooling writes the
+     * generated file after verifying the destination and ownership signature.
+     */
+    #[Route('/apibo/languages/translations/publish', name: 'symsvel_languages_translations_publish', methods: ['POST'], format: 'json', env: 'dev')]
+    public function publish(Request $request): JsonResponse
+    {
+        if (($error = $this->authorize($request, 'manage')) !== null) return $error;
+        if ($this->environment !== 'dev' || !$this->isLocal($request)) return self::error(403);
+        if (!class_exists(\SymSvel\Tooling\I18n\TranslationFilePublisher::class)) return self::error(503);
+        if (!str_starts_with(strtolower($request->headers->get('Content-Type', '')), 'application/json')
+            || strlen($request->getContent()) > 1024) return self::error(400);
+        try {
+            $data = json_decode($request->getContent(), true, 4, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return self::error(400);
+        }
+        if (!is_array($data) || array_is_list($data) || count($data) !== 2
+            || !is_string($data['scope'] ?? null) || !is_string($data['language'] ?? null)) return self::error(400);
+        try {
+            $dictionary = $this->translations->export($data['scope'], $data['language']);
+            $result = (new \SymSvel\Tooling\I18n\TranslationFilePublisher())->publish(
+                $this->backendDir, $data['scope'], $data['language'], $dictionary['content'],
+            );
+            return self::reply(['data' => [
+                'file' => $data['scope'].'/src/lib/i18n/generated/'.$data['language'].'.ts',
+                'changed' => $result['changed'],
+                'entries' => $dictionary['entries'],
+            ]]);
+        } catch (\InvalidArgumentException) {
+            return self::error(400);
+        } catch (\DomainException | \RuntimeException) {
+            return self::error(409);
+        }
+    }
+
+    private function isLocal(Request $request): bool
+    {
+        return in_array($request->getClientIp(), ['127.0.0.1', '::1'], true);
     }
 
     private function authorize(Request $request, string $action): ?JsonResponse
