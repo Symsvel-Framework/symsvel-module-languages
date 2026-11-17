@@ -186,3 +186,8 @@ Routes \`/apibo/languages/translations/export/csv\` (GET, ACL \`languages.manage
 ### Premier raccordement des dictionnaires aux hôtes (17/11/2026)
 
 BO, App et Front disposent maintenant du helper `src/lib/i18n/generated-translations.ts`. Vite intègre au build les fichiers `generated/<lang>.ts` présents ; la résolution des objets imbriqués conserve le fallback français à la clé. Les installations sans fichier généré restent compilables. Les libellés de l'authentification App (`auth.*`), des composants BO (`components.*`) et des écrans Languages (`languages.*`, `languages.translations.*`) consomment ces dictionnaires avec repli sur les valeurs intégrées. Les autres pages/modules devront encore adopter ce contrat ; le Front fournit le helper mais aucune page métier ne l'utilise encore. Ni lecture BDD/Redis au runtime ni rebuild automatique n'ont été introduits.
+
+
+### Contrôle fin des opérations du BO (17/11/2026)
+
+L'endpoint de capacités CSV accepte les acteurs possédant `languages.list`, afin de ne pas bloquer la lecture de l'éditeur. Il annonce `can_export`, `can_import` et `can_publish` uniquement si `languages.manage` est accordé, avec les restrictions d'environnement et de loopback propres aux opérations locales. Les endpoints de mutation continuent à appliquer l'ACL serveur indépendamment de l'état des boutons. Les routes d'import et de publication sont absentes en production par déclaration `env` Symfony.
