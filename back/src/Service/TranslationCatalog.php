@@ -78,7 +78,7 @@ final readonly class TranslationCatalog
     {
         $this->validateScope($scope);
         self::validateKey($key);
-        if ($description !== null && (strlen($description) > 4096 || str_contains($description, "\\0"))) {
+        if ($description !== null && (strlen($description) > 4096 || str_contains($description, "\0"))) {
             throw new \InvalidArgumentException('Invalid translation description.');
         }
         $this->db->transactional(function () use ($scope, $key, $description): void {
