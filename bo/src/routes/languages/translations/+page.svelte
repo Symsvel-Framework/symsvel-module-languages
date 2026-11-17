@@ -33,6 +33,7 @@
   let value = $state('');
   let description = $state('');
   let csvCanImport = $state(false);
+  let canPublish = $state(false);
   let csvContent = $state('');
   let csvName = $state('');
   let csvPreview = $state<CsvSummary | null>(null);
@@ -67,8 +68,9 @@
       languages = result.data;
       language = result.data.find((row) => row.primary)?.iso_code ?? result.data[0]?.iso_code ?? '';
       if (language) await loadEntries();
-      const caps = await boApi<{ data: { can_import: boolean } }>(`${base}/csv-capabilities`);
+      const caps = await boApi<{ data: { can_import: boolean; can_publish: boolean } }>(`${base}/csv-capabilities`);
       csvCanImport = caps.data.can_import;
+      canPublish = caps.data.can_publish;
     } catch (cause) {
       error = explain(cause);
     } finally {
@@ -181,6 +183,24 @@
     URL.revokeObjectURL(url);
   }
 
+  async function publishTs(): Promise<void> {
+    if (!canPublish || busy || !language) return;
+    busy = true;
+    error = '';
+    success = '';
+    try {
+      const result = await boApi<{ data: { file: string; changed: boolean; entries: number } }>(
+        `${base}/publish`,
+        { method: 'POST', body: JSON.stringify({ scope, language }) }
+      );
+      success = result.data.changed ? `${t.tsPublished}: ${result.data.file}` : t.tsUnchanged;
+    } catch (cause) {
+      error = explain(cause);
+    } finally {
+      busy = false;
+    }
+  }
+
   async function exportCsv(): Promise<void> {
     if (busy) return;
     busy = true;
@@ -269,6 +289,9 @@
         </select>
       </label>
       <Button type="button" onclick={download} disabled={busy || !language}>{t.export}</Button>
+      {#if canPublish}
+        <Button type="button" variant="secondary" onclick={publishTs} disabled={busy || !language}>{t.tsPublish}</Button>
+      {/if}
     </div>
     <p class="hint">{t.exportHint}</p>
     <div class="actions">
