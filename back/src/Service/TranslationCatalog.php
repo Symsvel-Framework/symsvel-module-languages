@@ -90,7 +90,7 @@ final readonly class TranslationCatalog
         // Prefer French when available, then the configured site primary,
         // finally the requested language. The requested language always wins.
         $values = [];
-        foreach (array_unique(['fr', $primary, $language]) as $code) {
+        foreach (array_unique([$primary, 'fr', $language]) as $code) {
             $rows = $this->db->fetchAllAssociative(
                 'SELECT translation_key, text_value FROM symsvel_translations WHERE scope = ? AND language = ? '
                 .'ORDER BY translation_key',
