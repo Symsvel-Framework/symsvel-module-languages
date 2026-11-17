@@ -155,12 +155,12 @@
   <section class="panel">
     <div class="selectors">
       <label>{t.scope}
-        <select bind:value={scope} onchange={() => { key = ''; value = ''; void loadEntries(); }}>
+        <select bind:value={scope} onchange={(event) => { scope = event.currentTarget.value as 'bo' | 'app' | 'front'; key = ''; value = ''; void loadEntries(); }}>
           <option value="bo">BO</option><option value="app">App</option><option value="front">Front</option>
         </select>
       </label>
       <label>{t.language}
-        <select bind:value={language} onchange={() => { key = ''; value = ''; void loadEntries(); }}>
+        <select bind:value={language} onchange={(event) => { language = event.currentTarget.value; key = ''; value = ''; void loadEntries(); }}>
           {#each languages as row (row.iso_code)}
             <option value={row.iso_code}>{row.name} ({row.iso_code})</option>
           {/each}
