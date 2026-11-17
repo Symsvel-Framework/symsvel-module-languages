@@ -32,3 +32,12 @@ avec repli sur le nom natif.
 
 Aucune sonde système, synchronisation réseau ou installation de
 traductions n'est lancée automatiquement.
+
+
+## Éditeur des traductions (chantier dev, 17/11/2026)
+
+Le bouton **Traductions** de la page Languages ouvre `/languages/translations`. Sélectionnez une interface (BO/App/Front) et une langue active ou en préouverture, puis saisissez une clé telle que `auth.signIn` et son texte. Les traductions sont enregistrées séparément pour chaque couple interface/langue. Vous pouvez reprendre une clé existante, modifier ou supprimer la valeur.
+
+Le bouton **Générer le fichier .ts** télécharge le dictionnaire TypeScript de la sélection. Les clés absentes utilisent les textes français disponibles, puis ceux de la langue principale du site, toujours avec priorité aux textes explicitement traduits dans la langue cible. Les clés sont triées pour fournir un résultat reproductible. La permission `languages.list` permet de consulter les valeurs ; `languages.manage` est requise pour modifier, supprimer ou exporter.
+
+**Limite actuelle :** ce téléchargement ne déploie pas le fichier dans BO/App/Front et ne reconstruit pas les builds Svelte. Les libellés intégrés de certaines pages ne consomment pas encore ce dictionnaire. L'installation d'une chaîne automatique depuis l'éditeur BO jusqu'au build est un chantier Tooling distinct, non validé.
