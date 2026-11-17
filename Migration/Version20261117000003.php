@@ -16,7 +16,7 @@ final class Version20261117000003 extends AbstractMigration
         $table->addColumn('scope', 'string', ['length' => 16]);
         $table->addColumn('translation_key', 'string', ['length' => 190]);
         $table->addColumn('language', 'string', ['length' => 4]);
-        $table->addColumn('value', 'text');
+        $table->addColumn('text_value', 'text');
         $table->setPrimaryKey(['scope', 'translation_key', 'language']);
     }
 
