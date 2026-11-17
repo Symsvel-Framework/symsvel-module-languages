@@ -31,6 +31,38 @@ final readonly class LanguageCatalog
     }
 
     /** @return list<array{iso_code:string,name:string,active:bool,pre_open:bool,primary:bool}> */
+    public function activeForAccounts(string $locale = ''): array
+    {
+        return array_values(array_filter($this->localizedRows($locale),
+            static fn (array $row): bool => $row['active']));
+    }
+
+    /**
+     * The language module owns eligibility, but account modules store only an ISO code.
+     * A single active language always resolves to the immutable site primary.
+     */
+    public function resolveAccountLanguage(?string $candidate): string
+    {
+        $primary = $this->settings->get('languages.primary_language');
+        $active = $this->activeForAccounts();
+        if (!is_string($primary) || $primary === '' || $active === []) {
+            throw new \\DomainException('Site language is not initialized.');
+        }
+        $codes = array_column($active, 'iso_code');
+        if (!in_array($primary, $codes, true)) {
+            throw new \\DomainException('Site primary language is not active.');
+        }
+        if (count($active) === 1) {
+            return $primary;
+        }
+        $code = $candidate === null ? $primary : strtolower(trim($candidate));
+        if (!preg_match('/^[a-z]{2,4}$/D', $code) || !in_array($code, $codes, true)) {
+            throw new \\InvalidArgumentException('Language must be active.');
+        }
+        return $code;
+    }
+
+    /** @return list<array{iso_code:string,name:string,active:bool,pre_open:bool,primary:bool}> */
     public function publicLanguages(string $locale = ''): array
     {
         $multilingual = $this->settings->get('languages.multilingual') === '1';
