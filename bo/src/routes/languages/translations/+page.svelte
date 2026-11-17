@@ -32,6 +32,7 @@
   let key = $state('');
   let value = $state('');
   let description = $state('');
+  let csvCanExport = $state(false);
   let csvCanImport = $state(false);
   let canPublish = $state(false);
   let csvContent = $state('');
@@ -68,7 +69,8 @@
       languages = result.data;
       language = result.data.find((row) => row.primary)?.iso_code ?? result.data[0]?.iso_code ?? '';
       if (language) await loadEntries();
-      const caps = await boApi<{ data: { can_import: boolean; can_publish: boolean } }>(`${base}/csv-capabilities`);
+      const caps = await boApi<{ data: { can_export: boolean; can_import: boolean; can_publish: boolean } }>(`${base}/csv-capabilities`);
+      csvCanExport = caps.data.can_export;
       csvCanImport = caps.data.can_import;
       canPublish = caps.data.can_publish;
     } catch (cause) {
@@ -295,7 +297,9 @@
     </div>
     <p class="hint">{t.exportHint}</p>
     <div class="actions">
-      <Button type="button" variant="secondary" onclick={exportCsv} disabled={busy}>{t.csvExport}</Button>
+      {#if csvCanExport}
+        <Button type="button" variant="secondary" onclick={exportCsv} disabled={busy}>{t.csvExport}</Button>
+      {/if}
     </div>
     {#if csvCanImport}
       <div class="csv-import">
