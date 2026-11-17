@@ -23,3 +23,10 @@ Le contrôle HTTP final est porté par `BoTranslationsController`. Le navigateur
 
 
 La liste BO des traductions provient du registre de clés `symsvel_translation_keys` et montre les entrées manquantes ainsi que leur fallback, sans écrire ce fallback en base. `POST /apibo/languages/translations/keys` prépare une clé vide avec une description facultative. Le format de l'export TypeScript est imbriqué (à l'identique du générateur HP étudié).
+
+
+## CSV production / import développement / publication locale
+
+Le BO appelle les routes \`export/csv\`, \`import/csv\`, \`csv-capabilities\` et \`publish\` via \`boApi\`. Le serveur expose l'export dans tous les environnements, mais les routes de modification des sources sont restreintes à \`dev\` et à la connexion loopback. Le bouton d'import n'est présenté que lorsque \`csv-capabilities.can_import\` est vrai ; le bouton de publication des .ts exige également \`can_publish\`.
+
+Le CSV contient les scopes, clés, descriptions, langues et valeurs de traduction. Une prévisualisation est obligatoire avant l'application d'un fichier ; les modifications non vides mettent à jour la BDD sans supprimer les entrées absentes. Le bouton local « Écrire le .ts » délègue l'opération de fichier au Tooling, qui refuse les destinations non gérées. Aucun rebuild Svelte n'est lancé par le BO et les pages existantes ne consomment pas encore automatiquement les fichiers générés.
