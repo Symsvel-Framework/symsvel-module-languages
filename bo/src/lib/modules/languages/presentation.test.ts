@@ -20,6 +20,8 @@ describe('Languages BO', () => {
   it('provides translated labels for the dictionary editor', () => {
     expect(languageCopy('fr').translations).toBe('Traductions');
     expect(translationCopy('en-US').export).toBe('Generate .ts file');
+    expect(translationCopy('fr').missing).toBe('manquantes');
+    expect(translationCopy('en').createKey).toBe('Create key');
     expect(translationCopy('es').title).toBe('Traductions');
   });
   it('filters, sorts and localizes', () => {
