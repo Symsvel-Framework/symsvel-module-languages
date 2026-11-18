@@ -82,6 +82,14 @@ final class TranslationCatalogTest extends TestCase
             $translations->save('bo', 'en', 'auth.signIn', 'Sign in');
             $translations->save('app', 'fr', 'auth.signIn', 'Espace client');
             self::assertCount(2, $translations->entries('bo', 'en'));
+            self::assertCount(0, $translations->entries('bo', 'en', 'admins'));
+            self::assertCount(2, $translations->entries('bo', 'en', 'auth'));
+            $stats = $translations->moduleStatistics('en', ['auth', 'admins']);
+            self::assertSame(2, $stats['total']);
+            self::assertSame(1, $stats['translated']);
+            self::assertSame(1, $stats['missing']);
+            self::assertSame(50, $stats['percent']);
+            self::assertNull($stats['modules'][2]['percent']);
             self::assertTrue($translations->entries('bo', 'en')[1]['missing_translation']);
             self::assertSame('Accueil', $translations->entries('bo', 'en')[1]['fallback_value']);
             self::assertCount(2, $translations->entries('bo', 'fr'));

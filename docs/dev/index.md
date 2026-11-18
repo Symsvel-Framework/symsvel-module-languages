@@ -205,3 +205,8 @@ Ce mécanisme ne reconstruit pas les fichiers Svelte et ne publie rien en produc
 ## Dictionnaires propres à Languages (18/11/2026)
 
 Les libellés BO de Languages sont fournis sous `bo/src/lib/translations/fr.ts` et `en.ts`, en incluant le sous-ensemble `translations`. Tooling copie ces fichiers dans l'hôte sous `lib/translations/languages`, les indexe en BDD et applique les surcharges publiées sous `lib/translations/generated`. Convention : `bo.languages.<clé>`. Le contrôleur de publication annonce désormais le nouveau chemin.
+
+
+## Indicateurs par module installé (18/11/2026)
+
+`TranslationCatalog::moduleStatistics()` calcule les effectifs à partir de `symsvel_translation_keys` et des textes réellement stockés pour la langue demandée. Le propriétaire est le premier segment de `translation_key`, le scope restant distinct. Les modules affichés viennent exclusivement de `backend/.symsvel/modules.json` produit par Tooling ; `system` représente les clés natives des hôtes. Les traductions de modules désinstallés ne sont pas affichées. Une langue manquante ou une valeur vide n'est jamais comptée comme traduite, et aucun fallback ne gonfle le numérateur. Un module sans clé a un pourcentage nul (`null`), et la progression globale est pondérée par le nombre de clés. Routes BO `GET /apibo/languages/translations/modules?language=en` et filtre optionnel `module` sur `GET /apibo/languages/translations` (ACL `languages.list`).

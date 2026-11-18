@@ -26,14 +26,17 @@ final readonly class TranslationCatalog
      *
      * @return list<array{scope:string,translation_key:string,description:?string,language:string,value:string,fallback_value:string,missing_translation:bool}>
      */
-    public function entries(string $scope, string $language): array
+    public function entries(string $scope, string $language, ?string $module = null): array
     {
         $this->validateScope($scope);
         $this->validateLanguage($language);
+        if ($module !== null && !preg_match('/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/D', $module)) {
+            throw new \InvalidArgumentException('Invalid translation module.');
+        }
         $keys = $this->db->fetchAllAssociative(
             'SELECT scope, translation_key, description FROM symsvel_translation_keys '
-            .'WHERE scope = ? ORDER BY translation_key',
-            [$scope],
+            .'WHERE scope = ?'.($module === null ? '' : ' AND translation_key LIKE ?').' ORDER BY translation_key',
+            $module === null ? [$scope] : [$scope, $module.'.%'],
         );
         $primary = $this->settings->get('languages.primary_language');
         if (!is_string($primary) || $primary === '') {
@@ -67,6 +70,59 @@ final readonly class TranslationCatalog
         }
 
         return $entries;
+    }
+
+    /**
+     * Count explicitly stored values for installed modules only. A missing or
+     * empty text is never counted as translated, even with a fallback.
+     *
+     * @param list<string> $installed
+     * @return array{language:string,modules:list<array{module:string,total:int,translated:int,missing:int,percent:?int}>,total:int,translated:int,missing:int,percent:?int}
+     */
+    public function moduleStatistics(string $language, array $installed): array
+    {
+        $this->validateLanguage($language);
+        $counts = [];
+        foreach (array_values(array_unique(array_merge(['system'], $installed))) as $module) {
+            if (!is_string($module) || !preg_match('/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/D', $module)) {
+                throw new \InvalidArgumentException('Invalid installed translation module.');
+            }
+            $counts[$module] = ['module' => $module, 'total' => 0, 'translated' => 0];
+        }
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT k.scope, k.translation_key, t.text_value FROM symsvel_translation_keys k '
+            .'LEFT JOIN symsvel_translations t ON k.scope = t.scope '
+            .'AND k.translation_key = t.translation_key AND t.language = ? '
+            .'ORDER BY k.scope, k.translation_key',
+            [$language],
+        );
+        foreach ($rows as $row) {
+            $key = (string) $row['translation_key'];
+            $dot = strpos($key, '.');
+            if ($dot === false) continue; // Legacy keys without a declared owner.
+            $owner = substr($key, 0, $dot);
+            if (!isset($counts[$owner])) continue; // Removed/noninstalled module.
+            ++$counts[$owner]['total'];
+            if (is_string($row['text_value']) && trim($row['text_value']) !== '') {
+                ++$counts[$owner]['translated'];
+            }
+        }
+        $modules = [];
+        $total = $translated = 0;
+        foreach ($counts as $count) {
+            $count['missing'] = $count['total'] - $count['translated'];
+            $count['percent'] = $count['total'] > 0
+                ? (int) round(100 * $count['translated'] / $count['total']) : null;
+            $modules[] = $count;
+            $total += $count['total'];
+            $translated += $count['translated'];
+        }
+        return [
+            'language' => $language, 'modules' => $modules,
+            'total' => $total, 'translated' => $translated,
+            'missing' => $total - $translated,
+            'percent' => $total > 0 ? (int) round(100 * $translated / $total) : null,
+        ];
     }
 
     /**
