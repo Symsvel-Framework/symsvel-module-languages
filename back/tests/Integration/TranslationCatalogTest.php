@@ -192,6 +192,22 @@ final class TranslationCatalogTest extends TestCase
         }
     }
 
+    public function testExportPreservesNumericKeySegmentsAsObjects(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $translations->save('bo', 'fr', 'auth.strengthLevels.0', 'Aucune saisie');
+            $translations->save('bo', 'fr', 'auth.strengthLevels.1', 'Très faible');
+            $export = $translations->export('bo', 'fr');
+            self::assertStringContainsString('"strengthLevels": {', $export['content']);
+            self::assertStringContainsString('"0": "Aucune saisie"', $export['content']);
+            self::assertStringContainsString('"1": "Très faible"', $export['content']);
+            self::assertStringNotContainsString('"strengthLevels": [', $export['content']);
+        } finally {
+            $db->close();
+        }
+    }
+
     public function testKeyExistsBeforeAnyTranslationIsSaved(): void
     {
         [$translations, , $db] = $this->catalog();

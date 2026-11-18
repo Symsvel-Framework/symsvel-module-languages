@@ -226,3 +226,8 @@ La CI d'intégration monte les dictionnaires du module Languages sous `src/lib/t
 Le libellé de navigation `bo.languages.translations` est un texte simple (« Traductions »). Les champs de l'écran d'édition sont regroupés sous `bo.languages.editor.*`, et non `bo.languages.translations.*`, afin d'éviter un conflit entre un texte et un objet lors de l'export TypeScript imbriqué. Une assertion de la CI verrouille les deux formes de clé.
 
 Le propriétaire `generated` est réservé au dossier des surcharges publiées : le synchroniseur Languages refuse tout enregistrement source prétendant provenir d'un module de ce nom. `system` reste autorisé uniquement pour les dictionnaires natifs validés par Tooling. Un test d'intégration vérifie le refus sans aucune écriture en base.
+
+
+### Export des clés à index numérique
+
+Les sous-clés des libellés de listes fixes (par exemple `auth.strengthLevels.0`) doivent toujours être sérialisées en **propriétés d'objet JSON**, et non en tableaux JSON. Le catalogue construit les dictionnaires imbriqués puis convertit chaque nœud en objet avant l'encodage. Ce contrat est nécessaire au chargeur Svelte, qui accède à chaque segment d'une clé sans interpréter les tableaux comme des traductions. Un test d'intégration couvre `strengthLevels.0` et `.1`.

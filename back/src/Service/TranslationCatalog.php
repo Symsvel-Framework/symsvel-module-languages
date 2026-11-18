@@ -259,7 +259,17 @@ final readonly class TranslationCatalog
             unset($item);
         };
         $sortNested($dictionary);
-        $json = json_encode($dictionary === [] ? new \stdClass() : $dictionary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+        // Numeric key segments must remain JSON object properties, not arrays.
+        // PHP turns numeric-string array keys into integers; encode each node
+        // as an object so Svelte can resolve `strengthLevels.0` as a dotted key.
+        $toObject = static function (array $node) use (&$toObject): \stdClass {
+            $object = new \stdClass();
+            foreach ($node as $key => $value) {
+                $object->{(string) $key} = is_array($value) ? $toObject($value) : $value;
+            }
+            return $object;
+        };
+        $json = json_encode($toObject($dictionary), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
             | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP
             | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
         return [
