@@ -40,6 +40,7 @@ final readonly class TranslationSourceSynchronizer
                 || !is_string($row['scope'] ?? null) || !in_array($row['scope'], ['bo', 'app', 'front'], true)
                 || !is_string($row['module'] ?? null)
                 || !preg_match('/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/D', $row['module'])
+                || $row['module'] === 'generated'
                 || !is_string($row['key'] ?? null) || !is_string($row['language'] ?? null)
                 || !isset($languages[$row['language']]) || !is_string($row['value'] ?? null)
                 || strlen($row['value']) > 8192 || str_contains($row['value'], "\0")) {

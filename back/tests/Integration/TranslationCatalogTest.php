@@ -171,6 +171,27 @@ final class TranslationCatalogTest extends TestCase
         }
     }
 
+    public function testRejectsGeneratedModuleOwnerBeforeDatabaseWrites(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        $file = tempnam(sys_get_temp_dir(), 'symsvel-i18n-reserved-');
+        try {
+            file_put_contents($file, json_encode(['schema' => 1, 'entries' => [[
+                'scope' => 'bo', 'module' => 'generated', 'key' => 'title',
+                'language' => 'fr', 'value' => 'Forbidden owner',
+            ]]], JSON_THROW_ON_ERROR));
+            try {
+                (new \SymSvel\Module\Languages\Service\TranslationSourceSynchronizer($db))->sync($file);
+                self::fail('Generated is a reserved translation owner.');
+            } catch (\InvalidArgumentException) {
+                self::assertSame([], $translations->entries('bo', 'fr'));
+            }
+        } finally {
+            if (is_file($file)) unlink($file);
+            $db->close();
+        }
+    }
+
     public function testKeyExistsBeforeAnyTranslationIsSaved(): void
     {
         [$translations, , $db] = $this->catalog();
