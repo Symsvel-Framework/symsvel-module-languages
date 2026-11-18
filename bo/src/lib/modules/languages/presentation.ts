@@ -104,6 +104,6 @@ export type TranslationCopy = (typeof translationLabels)['fr'];
 export function translationCopy(locale: string | null): TranslationCopy {
   const base = locale?.toLowerCase().split('-')[0] === 'en' ? translationLabels.en : translationLabels.fr;
   return Object.fromEntries(Object.entries(base).map(([key, value]) => [
-    key, generatedTranslation(locale, `bo.languages.translations.${key}`) ?? value
+    key, generatedTranslation(locale, `bo.languages.editor.${key}`) ?? value
   ])) as TranslationCopy;
 }

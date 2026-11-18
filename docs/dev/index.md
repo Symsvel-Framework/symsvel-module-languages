@@ -220,3 +220,7 @@ Le champ `scopes` des statistiques est calculé à partir des clés réellement 
 ### Assemblage de test du BO
 
 La CI d'intégration monte les dictionnaires du module Languages sous `src/lib/translations/languages`, comme le synchroniseur Tooling. Le test de présentation utilise ces chemins d'hôte, au lieu de tenter d'importer les fichiers source non installés. Le contrat est ainsi validé sur le BO assemblé, sans mettre les dictionnaires dans Back/Core.
+
+### Clé `translations` réservée au lien du module
+
+Le libellé de navigation `bo.languages.translations` est un texte simple (« Traductions »). Les champs de l'écran d'édition sont regroupés sous `bo.languages.editor.*`, et non `bo.languages.translations.*`, afin d'éviter un conflit entre un texte et un objet lors de l'export TypeScript imbriqué. Une assertion de la CI verrouille les deux formes de clé.

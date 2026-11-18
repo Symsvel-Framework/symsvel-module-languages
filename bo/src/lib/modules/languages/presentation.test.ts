@@ -39,6 +39,8 @@ describe('Languages BO', () => {
 describe('module dictionary contract', () => {
   it('keeps FR and EN module keys aligned', () => {
     expect(Object.keys(dictionariesFr).sort()).toEqual(Object.keys(dictionariesEn).sort());
-    expect(Object.keys(dictionariesFr.translations).sort()).toEqual(Object.keys(dictionariesEn.translations).sort());
+    expect(Object.keys(dictionariesFr.editor).sort()).toEqual(Object.keys(dictionariesEn.editor).sort());
+    expect(dictionariesFr.translations).toBe('Traductions');
+    expect(dictionariesEn.translations).toBe('Translations');
   });
 });
