@@ -83,6 +83,23 @@ final readonly class TranslationSourceSynchronizer
                     [$scope, $key, $language],
                 );
                 if ($existing === false) {
+                    // Legacy BO component customizations must survive the move
+                    // from components.<key> to system.<key> (public bo.system.*).
+                    $legacy = $scope === 'bo' && str_starts_with($key, 'system.')
+                        ? 'components.'.substr($key, strlen('system.')) : null;
+                    $legacyValue = $legacy === null ? false : $this->db->fetchOne(
+                        'SELECT text_value FROM symsvel_translations '
+                        .'WHERE scope = ? AND translation_key = ? AND language = ?',
+                        [$scope, $legacy, $language],
+                    );
+                    if ($legacyValue !== false && trim((string) $legacyValue) !== '') {
+                        $this->db->insert('symsvel_translations', $where + [
+                            'text_value' => (string) $legacyValue, 'customized' => true,
+                        ]);
+                        ++$result['texts_created'];
+                        ++$result['protected'];
+                        continue;
+                    }
                     $this->db->insert('symsvel_translations', $where + [
                         'text_value' => $value, 'customized' => false,
                     ]);

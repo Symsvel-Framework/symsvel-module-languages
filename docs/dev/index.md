@@ -210,3 +210,7 @@ Les libellés BO de Languages sont fournis sous `bo/src/lib/translations/fr.ts` 
 ## Indicateurs par module installé (18/11/2026)
 
 `TranslationCatalog::moduleStatistics()` calcule les effectifs à partir de `symsvel_translation_keys` et des textes réellement stockés pour la langue demandée. Le propriétaire est le premier segment de `translation_key`, le scope restant distinct. Les modules affichés viennent exclusivement de `backend/.symsvel/modules.json` produit par Tooling ; `system` représente les clés natives des hôtes. Les traductions de modules désinstallés ne sont pas affichées. Une langue manquante ou une valeur vide n'est jamais comptée comme traduite, et aucun fallback ne gonfle le numérateur. Un module sans clé a un pourcentage nul (`null`), et la progression globale est pondérée par le nombre de clés. Routes BO `GET /apibo/languages/translations/modules?language=en` et filtre optionnel `module` sur `GET /apibo/languages/translations` (ACL `languages.list`).
+
+### Compatibilité des personnalisations natives BO
+
+Lorsqu'une valeur native du BO passe de `components.<clé>` à `system.<clé>`, la synchronisation initiale détecte l'ancienne traduction personnalisée, la copie dans la clé canonique et la protège avec `customized=true`. L'ancienne clé n'est pas supprimée sans confirmation : elle reste consultable pour l'historique et le repli des builds existants. Les valeurs canoniques déjà personnalisées gardent toujours priorité. Un test d'intégration couvre cette migration non destructive.

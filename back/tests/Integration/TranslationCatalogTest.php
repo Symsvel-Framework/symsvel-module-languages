@@ -147,6 +147,28 @@ final class TranslationCatalogTest extends TestCase
         }
     }
 
+    public function testLegacyBoComponentsCustomizationsSurviveSystemNamespace(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        $file = tempnam(sys_get_temp_dir(), 'symsvel-i18n-legacy-');
+        try {
+            $translations->save('bo', 'fr', 'components.first', 'Revenir au début');
+            file_put_contents($file, json_encode(['schema' => 1, 'entries' => [[
+                'scope' => 'bo', 'module' => 'system', 'key' => 'first',
+                'language' => 'fr', 'value' => 'Première page',
+            ]]], JSON_THROW_ON_ERROR));
+            $sync = new \\SymSvel\\Module\\Languages\\Service\\TranslationSourceSynchronizer($db);
+            $result = $sync->sync($file);
+            self::assertSame(1, $result['protected']);
+            self::assertSame('Revenir au début', $translations->entries('bo', 'fr', 'system')[0]['value']);
+            self::assertSame(0, $sync->sync($file)['texts_updated']);
+            self::assertSame('Revenir au début', $translations->entries('bo', 'fr', 'components')[0]['value']);
+        } finally {
+            if (is_file($file)) unlink($file);
+            $db->close();
+        }
+    }
+
     public function testKeyExistsBeforeAnyTranslationIsSaved(): void
     {
         [$translations, , $db] = $this->catalog();
