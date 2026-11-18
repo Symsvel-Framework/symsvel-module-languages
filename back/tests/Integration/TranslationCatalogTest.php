@@ -159,7 +159,7 @@ final class TranslationCatalogTest extends TestCase
                 'scope' => 'bo', 'module' => 'system', 'key' => 'first',
                 'language' => 'fr', 'value' => 'Première page',
             ]]], JSON_THROW_ON_ERROR));
-            $sync = new \\SymSvel\\Module\\Languages\\Service\\TranslationSourceSynchronizer($db);
+            $sync = new \SymSvel\Module\Languages\Service\TranslationSourceSynchronizer($db);
             $result = $sync->sync($file);
             self::assertSame(1, $result['protected']);
             self::assertSame('Revenir au début', $translations->entries('bo', 'fr', 'system')[0]['value']);

@@ -1,5 +1,5 @@
-import dictionariesFr from '../../translations/fr';
-import dictionariesEn from '../../translations/en';
+import dictionariesFr from '../../translations/languages/fr';
+import dictionariesEn from '../../translations/languages/en';
 import { describe, expect, it } from 'vitest';
 import { languageCopy, translationCopy, filterLanguages, type BoLanguage } from './presentation';
 import { boNavigation } from './navigation';

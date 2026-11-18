@@ -216,3 +216,7 @@ Les libellés BO de Languages sont fournis sous `bo/src/lib/translations/fr.ts` 
 Lorsqu'une valeur native du BO passe de `components.<clé>` à `system.<clé>`, la synchronisation initiale détecte l'ancienne traduction personnalisée, la copie dans la clé canonique et la protège avec `customized=true`. L'ancienne clé n'est pas supprimée sans confirmation : elle reste consultable pour l'historique et le repli des builds existants. Les valeurs canoniques déjà personnalisées gardent toujours priorité. Un test d'intégration couvre cette migration non destructive.
 
 Le champ `scopes` des statistiques est calculé à partir des clés réellement enregistrées pour chaque propriétaire. L'éditeur propose le choix BO/App/Front uniquement lorsqu'au moins deux scopes contiennent des clés ; pour un seul scope, celui-ci est affiché sans liste déroulante. Les modules sans clés restent visibles, avec « aucune clé déclarée ».
+
+### Assemblage de test du BO
+
+La CI d'intégration monte les dictionnaires du module Languages sous `src/lib/translations/languages`, comme le synchroniseur Tooling. Le test de présentation utilise ces chemins d'hôte, au lieu de tenter d'importer les fichiers source non installés. Le contrat est ainsi validé sur le BO assemblé, sans mettre les dictionnaires dans Back/Core.
