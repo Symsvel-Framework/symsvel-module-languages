@@ -52,7 +52,14 @@ export default {
     "csvTextsNew": "Textes ajoutés",
     "csvTextsUpdated": "Textes remplacés",
     "csvUnchanged": "Sans changement",
-    "failure": "Impossible de traiter les traductions."
+    "failure": "Impossible de traiter les traductions.",
+    "chooseModule": "Choisir un module",
+    "backModules": "Retour aux modules",
+    "system": "Système",
+    "translatedCount": "clés traduites",
+    "noKeys": "Aucune clé déclarée",
+    "searchTranslations": "Rechercher une traduction",
+    "missingOnly": "Afficher uniquement les manquantes"
   },
   "intro": "Activez les langues publiques ou placez-les en préouverture pour préparer leurs traductions.",
   "publicState": "Active",

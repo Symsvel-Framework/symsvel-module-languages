@@ -75,6 +75,7 @@ const translationLabels = {
     csvApply: 'Importer les changements', csvImported: 'Traductions importées.',
     csvRows: 'Lignes', csvKeysNew: 'Clés ajoutées', csvKeysUpdated: 'Descriptions mises à jour',
     csvTextsNew: 'Textes ajoutés', csvTextsUpdated: 'Textes remplacés', csvUnchanged: 'Sans changement',
+    chooseModule: 'Choisir un module', backModules: 'Retour aux modules', system: 'Système', translatedCount: 'clés traduites', noKeys: 'Aucune clé déclarée', searchTranslations: 'Rechercher une traduction', missingOnly: 'Afficher uniquement les manquantes',
     failure: 'Impossible de traiter les traductions.'
   },
   en: {
@@ -95,6 +96,7 @@ const translationLabels = {
     csvApply: 'Apply changes', csvImported: 'Translations imported.',
     csvRows: 'Rows', csvKeysNew: 'Keys created', csvKeysUpdated: 'Descriptions updated',
     csvTextsNew: 'Texts created', csvTextsUpdated: 'Texts replaced', csvUnchanged: 'Unchanged',
+    chooseModule: 'Choose a module', backModules: 'Back to modules', system: 'System', translatedCount: 'translated keys', noKeys: 'No declared keys', searchTranslations: 'Search translations', missingOnly: 'Show missing only',
     failure: 'Cannot process translations.'
   }
 };

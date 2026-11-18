@@ -13,6 +13,8 @@
     scope: string; translation_key: string; language: string; value: string;
     description: string | null; fallback_value: string; missing_translation: boolean;
   };
+  type ModuleSummary = { module: string; total: number; translated: number; missing: number; percent: number | null };
+  type ModuleProgress = { language: string; modules: ModuleSummary[]; total: number; translated: number; missing: number; percent: number | null };
   type TsExport = { filename: string; content: string; entries: number };
   type CsvExport = { filename: string; content: string; rows: number };
   type CsvSummary = {
@@ -29,6 +31,15 @@
   let scope = $state<'bo' | 'app' | 'front'>('bo');
   let language = $state('');
   let entries = $state<Translation[]>([]);
+  let progress = $state<ModuleProgress | null>(null);
+  let selectedModule = $state('');
+  let search = $state('');
+  let missingOnly = $state(false);
+  const filteredEntries = $derived(entries.filter((entry) =>
+    (!missingOnly || entry.missing_translation) &&
+    (entry.translation_key.toLowerCase().includes(search.toLowerCase()) ||
+      (entry.value || entry.fallback_value).toLowerCase().includes(search.toLowerCase()))
+  ));
   let key = $state('');
   let value = $state('');
   let description = $state('');
@@ -58,7 +69,39 @@
 
   function params(includeKey = false): string {
     const baseParams = `scope=${encodeURIComponent(scope)}&language=${encodeURIComponent(language)}`;
-    return includeKey ? `${baseParams}&key=${encodeURIComponent(key)}` : baseParams;
+    const query = selectedModule ? `${baseParams}&module=${encodeURIComponent(selectedModule)}` : baseParams;
+    return includeKey ? `${query}&key=${encodeURIComponent(ownedKey())}` : query;
+  }
+
+  function ownedKey(): string {
+    const typed = key.trim();
+    return typed.startsWith(selectedModule + '.') ? typed : `${selectedModule}.${typed}`;
+  }
+
+  async function loadModules(): Promise<void> {
+    if (!language) { progress = null; return; }
+    try {
+      const result = await boApi<{ data: ModuleProgress }>(`${base}/modules?language=${encodeURIComponent(language)}`);
+      progress = result.data;
+    } catch (cause) { error = explain(cause); }
+  }
+
+  async function openModule(module: string): Promise<void> {
+    selectedModule = module;
+    scope = 'bo';
+    search = '';
+    missingOnly = false;
+    key = '';
+    value = '';
+    description = '';
+    await loadEntries();
+  }
+
+  function chooseLanguage(code: string): void {
+    language = code;
+    selectedModule = '';
+    entries = [];
+    void loadModules();
   }
 
   async function loadLanguages(): Promise<void> {
@@ -68,7 +111,7 @@
       const result = await boApi<{ data: BoLanguage[] }>('/apibo/languages/available');
       languages = result.data;
       language = result.data.find((row) => row.primary)?.iso_code ?? result.data[0]?.iso_code ?? '';
-      if (language) await loadEntries();
+      if (language) await loadModules();
       const caps = await boApi<{ data: { can_export: boolean; can_import: boolean; can_publish: boolean } }>(`${base}/csv-capabilities`);
       csvCanExport = caps.data.can_export;
       csvCanImport = caps.data.can_import;
@@ -81,7 +124,7 @@
   }
 
   async function loadEntries(): Promise<void> {
-    if (!language) { entries = []; return; }
+    if (!language || !selectedModule) { entries = []; return; }
     busy = true;
     error = '';
     try {
@@ -109,9 +152,10 @@
     try {
       await boApi(`${base}/keys`, {
         method: 'POST',
-        body: JSON.stringify({ scope, key: key.trim(), description: description.trim() || null })
+        body: JSON.stringify({ scope, key: ownedKey(), description: description.trim() || null })
       });
       await loadEntries();
+      await loadModules();
       success = t.keyCreated;
     } catch (cause) {
       error = explain(cause);
@@ -127,9 +171,10 @@
     success = '';
     try {
       await boApi<{ data: Translation }>(base, {
-        method: 'PUT', body: JSON.stringify({ scope, language, key: key.trim(), value })
+        method: 'PUT', body: JSON.stringify({ scope, language, key: ownedKey(), value })
       });
       await loadEntries();
+      await loadModules();
       success = t.saved;
     } catch (cause) {
       error = explain(cause);
@@ -149,6 +194,7 @@
       value = '';
       description = '';
       await loadEntries();
+      await loadModules();
       success = t.deleted;
     } catch (cause) {
       error = explain(cause);
@@ -254,7 +300,8 @@
         csvContent = '';
         csvName = '';
         csvPreview = null;
-        await loadEntries();
+        if (selectedModule) await loadEntries();
+        await loadModules();
       }
       success = mode === 'apply' ? t.csvImported : t.csvPreviewReady;
     } catch (cause) {
@@ -278,24 +325,27 @@
   {#if success}<Alert kind="success">{success}</Alert>{/if}
   <section class="panel">
     <div class="selectors">
-      <label>{t.scope}
-        <select bind:value={scope} onchange={(event) => { scope = event.currentTarget.value as 'bo' | 'app' | 'front'; key = ''; value = ''; void loadEntries(); }}>
-          <option value="bo">BO</option><option value="app">App</option><option value="front">Front</option>
-        </select>
-      </label>
       <label>{t.language}
-        <select bind:value={language} onchange={(event) => { language = event.currentTarget.value; key = ''; value = ''; void loadEntries(); }}>
+        <select bind:value={language} onchange={(event) => chooseLanguage(event.currentTarget.value)}>
           {#each languages as row (row.iso_code)}
             <option value={row.iso_code}>{row.name} ({row.iso_code})</option>
           {/each}
         </select>
       </label>
-      <Button type="button" onclick={download} disabled={busy || !language}>{t.export}</Button>
-      {#if canPublish}
-        <Button type="button" variant="secondary" onclick={publishTs} disabled={busy || !language}>{t.tsPublish}</Button>
+      {#if selectedModule}
+        <Button type="button" variant="secondary" onclick={() => { selectedModule = ''; entries = []; }}>{t.backModules}</Button>
+        <label>{t.scope}
+          <select bind:value={scope} onchange={(event) => { scope = event.currentTarget.value as 'bo' | 'app' | 'front'; key = ''; value = ''; void loadEntries(); }}>
+            <option value="bo">BO</option><option value="app">App</option><option value="front">Front</option>
+          </select>
+        </label>
+        <Button type="button" onclick={download} disabled={busy || !language}>{t.export}</Button>
+        {#if canPublish}
+          <Button type="button" variant="secondary" onclick={publishTs} disabled={busy || !language}>{t.tsPublish}</Button>
+        {/if}
       {/if}
     </div>
-    <p class="hint">{t.exportHint}</p>
+    {#if selectedModule}<p class="hint">{t.exportHint}</p>{/if}
     <div class="actions">
       {#if csvCanExport}
         <Button type="button" variant="secondary" onclick={exportCsv} disabled={busy}>{t.csvExport}</Button>
@@ -324,6 +374,27 @@
       </div>
     {/if}
   </section>
+  {#if !selectedModule}
+    <section class="panel">
+      <h2>{t.chooseModule}</h2>
+      {#if progress}
+        <p>{progress.translated} / {progress.total} {t.translatedCount}
+          {#if progress.percent !== null} ({progress.percent}%){/if}
+        </p>
+        <div class="module-grid">
+          {#each progress.modules as item (item.module)}
+            <button type="button" class="module-card" onclick={() => { void openModule(item.module); }}>
+              <strong>{item.module === 'system' ? t.system : item.module}</strong>
+              <span>{item.translated} / {item.total} {t.translatedCount}, {item.missing} {t.missing}</span>
+              <progress value={item.translated} max={Math.max(1, item.total)}></progress>
+              <span>{item.percent === null ? t.noKeys : item.percent + '%'}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </section>
+  {/if}
+  {#if selectedModule}
   <section class="panel">
     <h2>{t.editor}</h2>
     <form onsubmit={(event) => { event.preventDefault(); void save(); }}>
@@ -340,13 +411,17 @@
   </section>
   <section class="panel">
     <h2>{t.entries} ({entries.length}, {missing} {t.missing})</h2>
+    <div class="entry-filters">
+      <label>{t.searchTranslations}<input bind:value={search} placeholder={t.searchTranslations} /></label>
+      <label><input type="checkbox" bind:checked={missingOnly} /> {t.missingOnly}</label>
+    </div>
     {#if entries.length === 0}
       <p>{t.empty}</p>
     {:else}
       <div class="table-wrap"><table>
         <thead><tr><th>{t.key}</th><th>{t.value}</th><th>{t.status}</th><th></th></tr></thead>
         <tbody>
-          {#each entries as entry (entry.translation_key)}
+          {#each filteredEntries as entry (entry.translation_key)}
             <tr>
               <td><code>{entry.translation_key}</code></td>
               <td>{entry.value || entry.fallback_value || '—'}{#if entry.missing_translation && entry.fallback_value} <span class="fallback">({t.fallback})</span>{/if}</td>
@@ -358,6 +433,7 @@
       </table></div>
     {/if}
   </section>
+  {/if}
 </div>
 
 <style>
@@ -377,5 +453,11 @@
   th, td { text-align: left; border-bottom: 1px solid #e2e7ee; padding: 10px; }
   td { overflow-wrap: anywhere; }
   .fallback { color: #667085; font-size: 0.85em; }
+  .module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .module-card { display: grid; gap: 8px; text-align: left; padding: 16px; border: 1px solid #cbd5e1; border-radius: 10px; background: white; cursor: pointer; }
+  .module-card:hover, .module-card:focus-visible { border-color: #2563eb; }
+  .module-card progress { width: 100%; }
+  .entry-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin-bottom: 16px; }
+  .entry-filters label { display: flex; align-items: center; gap: 8px; }
   @media (max-width: 650px) { .selectors { display: grid; } }
 </style>

@@ -52,7 +52,14 @@ export default {
     "csvTextsNew": "Texts created",
     "csvTextsUpdated": "Texts replaced",
     "csvUnchanged": "Unchanged",
-    "failure": "Cannot process translations."
+    "failure": "Cannot process translations.",
+    "chooseModule": "Choose a module",
+    "backModules": "Back to modules",
+    "system": "System",
+    "translatedCount": "translated keys",
+    "noKeys": "No declared keys",
+    "searchTranslations": "Search translations",
+    "missingOnly": "Show missing only"
   },
   "intro": "Enable public languages or put them in pre-opening to prepare translations.",
   "publicState": "Active",
