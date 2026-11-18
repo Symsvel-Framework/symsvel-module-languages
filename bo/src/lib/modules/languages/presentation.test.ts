@@ -1,3 +1,5 @@
+import dictionariesFr from '../../translations/fr';
+import dictionariesEn from '../../translations/en';
 import { describe, expect, it } from 'vitest';
 import { languageCopy, translationCopy, filterLanguages, type BoLanguage } from './presentation';
 import { boNavigation } from './navigation';
@@ -30,5 +32,13 @@ describe('Languages BO', () => {
     expect(languageCopy('fr-FR').primaryProtected).toContain('principale');
     expect(languageCopy('en-US').primary).toBe('Primary');
     expect(languageCopy('es-ES').primary).toBe('Principale');
+  });
+});
+
+
+describe('module dictionary contract', () => {
+  it('keeps FR and EN module keys aligned', () => {
+    expect(Object.keys(dictionariesFr).sort()).toEqual(Object.keys(dictionariesEn).sort());
+    expect(Object.keys(dictionariesFr.translations).sort()).toEqual(Object.keys(dictionariesEn.translations).sort());
   });
 });

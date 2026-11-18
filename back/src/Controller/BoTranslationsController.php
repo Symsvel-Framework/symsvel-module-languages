@@ -199,7 +199,7 @@ final readonly class BoTranslationsController
                 $this->backendDir, $data['scope'], $data['language'], $dictionary['content'],
             );
             return self::reply(['data' => [
-                'file' => $data['scope'].'/src/lib/i18n/generated/'.$data['language'].'.ts',
+                'file' => $data['scope'].'/src/lib/translations/generated/'.$data['language'].'.ts',
                 'changed' => $result['changed'],
                 'entries' => $dictionary['entries'],
             ]]);
