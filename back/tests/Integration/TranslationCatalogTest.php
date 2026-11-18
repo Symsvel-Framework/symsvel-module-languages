@@ -83,7 +83,7 @@ final class TranslationCatalogTest extends TestCase
             $translations->save('app', 'fr', 'auth.signIn', 'Espace client');
             self::assertCount(2, $translations->entries('bo', 'en'));
             self::assertCount(0, $translations->entries('bo', 'en', 'admins'));
-            self::assertCount(2, $translations->entries('bo', 'en', 'auth'));
+            self::assertCount(1, $translations->entries('bo', 'en', 'auth'));
             $stats = $translations->moduleStatistics('en', ['auth', 'admins']);
             self::assertSame(2, $stats['total']);
             self::assertSame(1, $stats['translated']);
