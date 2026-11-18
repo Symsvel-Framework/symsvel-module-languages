@@ -13,7 +13,7 @@
     scope: string; translation_key: string; language: string; value: string;
     description: string | null; fallback_value: string; missing_translation: boolean;
   };
-  type ModuleSummary = { module: string; total: number; translated: number; missing: number; percent: number | null };
+  type ModuleSummary = { module: string; total: number; translated: number; missing: number; percent: number | null; scopes: ('bo' | 'app' | 'front')[] };
   type ModuleProgress = { language: string; modules: ModuleSummary[]; total: number; translated: number; missing: number; percent: number | null };
   type TsExport = { filename: string; content: string; entries: number };
   type CsvExport = { filename: string; content: string; rows: number };
@@ -33,6 +33,7 @@
   let entries = $state<Translation[]>([]);
   let progress = $state<ModuleProgress | null>(null);
   let selectedModule = $state('');
+  const activeScopes = $derived(progress?.modules.find((module) => module.module === selectedModule)?.scopes ?? []);
   let search = $state('');
   let missingOnly = $state(false);
   const filteredEntries = $derived(entries.filter((entry) =>
@@ -86,9 +87,9 @@
     } catch (cause) { error = explain(cause); }
   }
 
-  async function openModule(module: string): Promise<void> {
-    selectedModule = module;
-    scope = 'bo';
+  async function openModule(module: ModuleSummary): Promise<void> {
+    selectedModule = module.module;
+    scope = module.scopes[0] ?? 'bo';
     search = '';
     missingOnly = false;
     key = '';
@@ -334,11 +335,17 @@
       </label>
       {#if selectedModule}
         <Button type="button" variant="secondary" onclick={() => { selectedModule = ''; entries = []; }}>{t.backModules}</Button>
-        <label>{t.scope}
-          <select bind:value={scope} onchange={(event) => { scope = event.currentTarget.value as 'bo' | 'app' | 'front'; key = ''; value = ''; void loadEntries(); }}>
-            <option value="bo">BO</option><option value="app">App</option><option value="front">Front</option>
-          </select>
-        </label>
+        {#if activeScopes.length > 1}
+          <label>{t.scope}
+            <select bind:value={scope} onchange={(event) => { scope = event.currentTarget.value as 'bo' | 'app' | 'front'; key = ''; value = ''; void loadEntries(); }}>
+              {#each activeScopes as item (item)}
+                <option value={item}>{item.toUpperCase()}</option>
+              {/each}
+            </select>
+          </label>
+        {:else if activeScopes.length === 1}
+          <span>{activeScopes[0].toUpperCase()}</span>
+        {/if}
         <Button type="button" onclick={download} disabled={busy || !language}>{t.export}</Button>
         {#if canPublish}
           <Button type="button" variant="secondary" onclick={publishTs} disabled={busy || !language}>{t.tsPublish}</Button>
@@ -383,7 +390,7 @@
         </p>
         <div class="module-grid">
           {#each progress.modules as item (item.module)}
-            <button type="button" class="module-card" onclick={() => { void openModule(item.module); }}>
+            <button type="button" class="module-card" onclick={() => { void openModule(item); }}>
               <strong>{item.module === 'system' ? t.system : item.module}</strong>
               <span>{item.translated} / {item.total} {t.translatedCount}, {item.missing} {t.missing}</span>
               <progress value={item.translated} max={Math.max(1, item.total)}></progress>

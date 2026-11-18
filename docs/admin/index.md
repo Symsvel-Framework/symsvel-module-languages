@@ -69,3 +69,5 @@ Les dictionnaires de référence d'un module sont enregistrés lors de l'install
 ## Parcours de traduction par langue puis module (18/11/2026)
 
 L'administrateur choisit d'abord la langue active ou préouverte, puis un des modules réellement installés ou la rubrique Système. La liste affiche un pourcentage calculé sur les clés déclarées, le nombre traduit/manquant et une progression. Zéro clé ne signifie pas 100 %. Dans le module, l'administrateur choisit éventuellement BO/App/Front, filtre/recherche puis édite les clés préfixées du module. Les imports/exports CSV conservent leur portée globale, et l'export `.ts` reste par scope et langue. La CI et les CT XT doivent confirmer le parcours et les droits ACL.
+
+Lorsqu'un module n'a de traductions que dans un seul scope (par exemple BO), l'éditeur n'affiche pas de sélecteur BO/App/Front inutile. Plusieurs scopes déclarés restent sélectionnables dans le module, sans modifier la langue courante.

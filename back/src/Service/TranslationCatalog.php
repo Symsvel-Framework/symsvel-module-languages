@@ -87,7 +87,7 @@ final readonly class TranslationCatalog
             if (!is_string($module) || !preg_match('/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/D', $module)) {
                 throw new \InvalidArgumentException('Invalid installed translation module.');
             }
-            $counts[$module] = ['module' => $module, 'total' => 0, 'translated' => 0];
+            $counts[$module] = ['module' => $module, 'total' => 0, 'translated' => 0, 'scopes' => []];
         }
         $rows = $this->db->fetchAllAssociative(
             'SELECT k.scope, k.translation_key, t.text_value FROM symsvel_translation_keys k '
@@ -103,6 +103,7 @@ final readonly class TranslationCatalog
             $owner = substr($key, 0, $dot);
             if (!isset($counts[$owner])) continue; // Removed/noninstalled module.
             ++$counts[$owner]['total'];
+            $counts[$owner]['scopes'][(string) $row['scope']] = true;
             if (is_string($row['text_value']) && trim($row['text_value']) !== '') {
                 ++$counts[$owner]['translated'];
             }
@@ -110,6 +111,7 @@ final readonly class TranslationCatalog
         $modules = [];
         $total = $translated = 0;
         foreach ($counts as $count) {
+            $count['scopes'] = array_values(array_intersect(['bo', 'app', 'front'], array_keys($count['scopes'])));
             $count['missing'] = $count['total'] - $count['translated'];
             $count['percent'] = $count['total'] > 0
                 ? (int) round(100 * $count['translated'] / $count['total']) : null;

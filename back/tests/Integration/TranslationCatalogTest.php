@@ -90,6 +90,8 @@ final class TranslationCatalogTest extends TestCase
             self::assertSame(1, $stats['missing']);
             self::assertSame(50, $stats['percent']);
             self::assertNull($stats['modules'][2]['percent']);
+            self::assertSame(['bo', 'app'], $stats['modules'][1]['scopes']);
+            self::assertSame([], $stats['modules'][2]['scopes']);
             self::assertTrue($translations->entries('bo', 'en')[1]['missing_translation']);
             self::assertSame('Accueil', $translations->entries('bo', 'en')[1]['fallback_value']);
             self::assertCount(2, $translations->entries('bo', 'fr'));
