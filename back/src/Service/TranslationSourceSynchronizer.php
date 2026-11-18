@@ -88,6 +88,15 @@ final readonly class TranslationSourceSynchronizer
                     // from components.<key> to system.<key> (public bo.system.*).
                     $legacy = $scope === 'bo' && str_starts_with($key, 'system.')
                         ? 'components.'.substr($key, strlen('system.')) : null;
+                    // The App host dashboard used to be stored in Auth before
+                    // its native system dictionary was introduced.
+                    if ($scope === 'app') {
+                        $legacy = match ($key) {
+                            'system.dashboard.title' => 'auth.dashboard',
+                            'system.dashboard.loggedIn' => 'auth.loggedIn',
+                            default => null,
+                        };
+                    }
                     $legacyValue = $legacy === null ? false : $this->db->fetchOne(
                         'SELECT text_value FROM symsvel_translations '
                         .'WHERE scope = ? AND translation_key = ? AND language = ?',

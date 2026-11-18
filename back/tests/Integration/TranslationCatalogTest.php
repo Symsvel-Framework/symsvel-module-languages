@@ -171,6 +171,31 @@ final class TranslationCatalogTest extends TestCase
         }
     }
 
+    public function testLegacyAppAuthDashboardCustomizationIsPreserved(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        $file = tempnam(sys_get_temp_dir(), 'symsvel-app-dashboard-');
+        try {
+            $translations->save('app', 'fr', 'auth.dashboard', 'Mon espace spécial');
+            $translations->save('app', 'fr', 'auth.loggedIn', 'Session personnalisée');
+            file_put_contents($file, json_encode(['schema' => 1, 'entries' => [
+                ['scope' => 'app', 'module' => 'system', 'key' => 'dashboard.title',
+                    'language' => 'fr', 'value' => 'Mon espace'],
+                ['scope' => 'app', 'module' => 'system', 'key' => 'dashboard.loggedIn',
+                    'language' => 'fr', 'value' => 'Session App vérifiée.'],
+            ]], JSON_THROW_ON_ERROR));
+            $sync = new \SymSvel\Module\Languages\Service\TranslationSourceSynchronizer($db);
+            self::assertSame(2, $sync->sync($file)['protected']);
+            $rows = $translations->entries('app', 'fr', 'system');
+            self::assertSame('Session personnalisée', $rows[0]['value']);
+            self::assertSame('Mon espace spécial', $rows[1]['value']);
+            self::assertSame(2, $sync->sync($file)['protected']);
+        } finally {
+            if (is_file($file)) unlink($file);
+            $db->close();
+        }
+    }
+
     public function testRejectsGeneratedModuleOwnerBeforeDatabaseWrites(): void
     {
         [$translations, , $db] = $this->catalog();

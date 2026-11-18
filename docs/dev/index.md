@@ -236,3 +236,7 @@ Les sous-clés des libellés de listes fixes (par exemple `auth.strengthLevels.0
 ### Publication `.ts` : uniquement les surcharges personnalisées
 
 `GET /apibo/languages/translations/export` conserve son export complet (valeurs + fallbacks) pour téléchargement et audit. En revanche, l'action BO de publication locale appelle `TranslationCatalog::export(scope, langue, overridesOnly: true)`, qui inclut uniquement les textes explicitement marqués `customized=true` pour la langue demandée. Les valeurs sources non personnalisées et les fallbacks ne sont **jamais recopiés** dans `src/lib/translations/generated/<lang>.ts`, afin qu'une mise à jour de module puisse effectivement renouveler ses textes par défaut. Les autres langues conservent leur propre dictionnaire de surcharges ; le helper statique applique le repli clé par clé. Une couverture d'intégration compare explicitement publication ciblée et export complet.
+
+### Compatibilité des textes de dashboard App
+
+Lors du déplacement des libellés d'accueil App depuis `auth.dashboard`/`auth.loggedIn` vers `system.dashboard.title`/`system.dashboard.loggedIn`, les traductions historiques présentes en BDD sont copiées dans les nouvelles clés canoniques et marquées `customized=true` si elles n'existent pas déjà. Les anciens enregistrements sont conservés. Un test couvre la conservation et l'idempotence de la synchronisation.
