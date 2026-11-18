@@ -201,7 +201,7 @@ final readonly class TranslationCatalog
     }
 
     /** @return array{filename:string,content:string,entries:int} */
-    public function export(string $scope, string $language): array
+    public function export(string $scope, string $language, bool $overridesOnly = false): array
     {
         $this->validateScope($scope);
         $this->validateLanguage($language);
@@ -214,13 +214,18 @@ final readonly class TranslationCatalog
         // Prefer French when available, then the configured site primary,
         // finally the requested language. The requested language always wins.
         $values = [];
-        foreach (array_unique([$primary, 'fr', $language]) as $code) {
+        // Build-time generated files must only override explicit admin/CSV
+        // customizations, not freeze defaults or fallback from module sources.
+        foreach (array_unique($overridesOnly ? [$language] : [$primary, 'fr', $language]) as $code) {
             $rows = $this->db->fetchAllAssociative(
-                'SELECT translation_key, text_value FROM symsvel_translations WHERE scope = ? AND language = ? '
+                'SELECT translation_key, text_value, customized FROM symsvel_translations WHERE scope = ? AND language = ? '
                 .'ORDER BY translation_key',
                 [$scope, $code],
             );
             foreach ($rows as $row) {
+                if ($overridesOnly && !in_array($row['customized'], [true, 1, '1', 't', 'true', 'TRUE'], true)) {
+                    continue;
+                }
                 $value = (string) $row['text_value'];
                 if (trim($value) !== '') {
                     $values[(string) $row['translation_key']] = $value;

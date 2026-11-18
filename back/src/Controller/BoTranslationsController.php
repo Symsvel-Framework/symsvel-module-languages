@@ -223,7 +223,7 @@ final readonly class BoTranslationsController
         if (!is_array($data) || array_is_list($data) || count($data) !== 2
             || !is_string($data['scope'] ?? null) || !is_string($data['language'] ?? null)) return self::error(400);
         try {
-            $dictionary = $this->translations->export($data['scope'], $data['language']);
+            $dictionary = $this->translations->export($data['scope'], $data['language'], true);
             $result = (new \SymSvel\Tooling\I18n\TranslationFilePublisher())->publish(
                 $this->backendDir, $data['scope'], $data['language'], $dictionary['content'],
             );

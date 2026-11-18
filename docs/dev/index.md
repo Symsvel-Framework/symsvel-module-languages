@@ -231,3 +231,8 @@ Le propriétaire `generated` est réservé au dossier des surcharges publiées :
 ### Export des clés à index numérique
 
 Les sous-clés des libellés de listes fixes (par exemple `auth.strengthLevels.0`) doivent toujours être sérialisées en **propriétés d'objet JSON**, et non en tableaux JSON. Le catalogue construit les dictionnaires imbriqués puis convertit chaque nœud en objet avant l'encodage. Ce contrat est nécessaire au chargeur Svelte, qui accède à chaque segment d'une clé sans interpréter les tableaux comme des traductions. Un test d'intégration couvre `strengthLevels.0` et `.1`.
+
+
+### Publication `.ts` : uniquement les surcharges personnalisées
+
+`GET /apibo/languages/translations/export` conserve son export complet (valeurs + fallbacks) pour téléchargement et audit. En revanche, l'action BO de publication locale appelle `TranslationCatalog::export(scope, langue, overridesOnly: true)`, qui inclut uniquement les textes explicitement marqués `customized=true` pour la langue demandée. Les valeurs sources non personnalisées et les fallbacks ne sont **jamais recopiés** dans `src/lib/translations/generated/<lang>.ts`, afin qu'une mise à jour de module puisse effectivement renouveler ses textes par défaut. Les autres langues conservent leur propre dictionnaire de surcharges ; le helper statique applique le repli clé par clé. Une couverture d'intégration compare explicitement publication ciblée et export complet.

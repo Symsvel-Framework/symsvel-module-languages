@@ -192,6 +192,31 @@ final class TranslationCatalogTest extends TestCase
         }
     }
 
+    public function testPublishedDictionariesContainOnlyExplicitCustomizations(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $translations->registerKey('bo', 'auth.default');
+            $db->insert('symsvel_translations', [
+                'scope' => 'bo', 'translation_key' => 'auth.default',
+                'language' => 'en', 'text_value' => 'Module default', 'customized' => false,
+            ]);
+            $translations->save('bo', 'fr', 'auth.frenchOnly', 'Personnalisé en français');
+            $translations->save('bo', 'en', 'auth.signIn', 'Custom sign in');
+            $published = $translations->export('bo', 'en', true);
+            self::assertSame(1, $published['entries']);
+            self::assertStringContainsString('Custom sign in', $published['content']);
+            self::assertStringNotContainsString('Module default', $published['content']);
+            self::assertStringNotContainsString('Personnalisé en français', $published['content']);
+            $complete = $translations->export('bo', 'en');
+            self::assertSame(3, $complete['entries']);
+            self::assertStringContainsString('Module default', $complete['content']);
+            self::assertStringContainsString('Personnalisé en français', $complete['content']);
+        } finally {
+            $db->close();
+        }
+    }
+
     public function testExportPreservesNumericKeySegmentsAsObjects(): void
     {
         [$translations, , $db] = $this->catalog();
