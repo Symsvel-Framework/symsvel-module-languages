@@ -50,6 +50,10 @@ final class TranslationCatalogTest extends TestCase
         $keysMigration = (new \ReflectionClass(\DoctrineMigrations\Version20261117000004::class))
             ->newInstanceWithoutConstructor();
         $keysMigration->up($schema);
+        require_once dirname(__DIR__, 2).'/../Migration/Version20261118000001.php';
+        $sourceMigration = (new \ReflectionClass(\DoctrineMigrations\Version20261118000001::class))
+            ->newInstanceWithoutConstructor();
+        $sourceMigration->up($schema);
         foreach ($schema->toSql($db->getDatabasePlatform()) as $sql) $db->executeStatement($sql);
         foreach (['fr', 'en', 'de'] as $code) {
             $db->insert('symsvel_languages', [
@@ -103,6 +107,34 @@ final class TranslationCatalogTest extends TestCase
             $this->expectException(\DomainException::class);
             $translations->export('bo', 'en');
         } finally {
+            $db->close();
+        }
+    }
+
+    public function testSourceSyncIsIdempotentAndPreservesBoCustomizations(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        $file = tempnam(sys_get_temp_dir(), 'symsvel-i18n-source-');
+        try {
+            $payload = ['schema' => 1, 'entries' => [
+                ['scope' => 'bo', 'module' => 'admins', 'key' => 'invite.title', 'language' => 'fr', 'value' => 'Inviter'],
+                ['scope' => 'bo', 'module' => 'admins', 'key' => 'invite.title', 'language' => 'en', 'value' => 'Invite'],
+            ]];
+            file_put_contents($file, json_encode($payload, JSON_THROW_ON_ERROR));
+            $sync = new \SymSvel\Module\Languages\Service\TranslationSourceSynchronizer($db);
+            self::assertSame(2, $sync->sync($file)['texts_created']);
+            self::assertSame(0, $sync->sync($file)['texts_created']);
+            self::assertSame(0, $sync->sync($file)['texts_updated']);
+            $translations->save('bo', 'fr', 'admins.invite.title', 'Invitation personnalisée');
+            $payload['entries'][0]['value'] = 'Nouvelle valeur source';
+            $payload['entries'][1]['value'] = 'Updated invite';
+            file_put_contents($file, json_encode($payload, JSON_THROW_ON_ERROR));
+            $result = $sync->sync($file);
+            self::assertSame(1, $result['texts_updated']);
+            self::assertSame('Invitation personnalisée', $translations->entries('bo', 'fr')[0]['value']);
+            self::assertSame('Updated invite', $translations->entries('bo', 'en')[0]['value']);
+        } finally {
+            if (is_file($file)) unlink($file);
             $db->close();
         }
     }

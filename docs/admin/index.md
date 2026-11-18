@@ -59,3 +59,8 @@ Dans le BO de développement local, **Importer les traductions** permet de séle
 Toujours depuis le BO de développement local, le bouton **Écrire le .ts en local** délègue l'enregistrement au Tooling, pour l'interface et la langue affichées. Le résultat est enregistré à l'emplacement \`<scope>/src/lib/i18n/generated/<lang>.ts\`. Ce fichier doit ensuite être intégré à la lecture i18n des pages, versionné et publié par le circuit Git/CD ; aucun rebuild n'est lancé automatiquement. Le téléchargement manuel d'un fichier .ts reste possible.
 
 En production, la création ou modification d'une entrée en BDD n'est pas immédiatement visible dans les interfaces statiques : elle apparaît après son import dans dev, la mise à jour des sources et le déploiement CD. La gestion de cache/Redis est hors de ce chantier.
+
+
+## Textes fournis par les modules
+
+Les dictionnaires de référence d'un module sont enregistrés lors de l'installation, après les migrations. Les textes personnalisés depuis le BO ou importés depuis un CSV sont protégés lors des mises à jour du module. Les nouvelles valeurs par défaut ne remplacent que les textes non personnalisés. La convention complète est `<scope>.<module|system>.<key>` ; `system` ne correspond qu'aux composants natifs des hôtes Svelte. L'édition BO n'exige pas d'activer le multilinguisme.

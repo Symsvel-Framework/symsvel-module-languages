@@ -191,3 +191,12 @@ BO, App et Front disposent maintenant du helper `src/lib/i18n/generated-translat
 ### Contrôle fin des opérations du BO (17/11/2026)
 
 L'endpoint de capacités CSV accepte les acteurs possédant `languages.list`, afin de ne pas bloquer la lecture de l'éditeur. Il annonce `can_export`, `can_import` et `can_publish` uniquement si `languages.manage` est accordé, avec les restrictions d'environnement et de loopback propres aux opérations locales. Les endpoints de mutation continuent à appliquer l'ACL serveur indépendamment de l'état des boutons. Les routes d'import et de publication sont absentes en production par déclaration `env` Symfony.
+
+
+## Dictionnaires des modules et synchronisation post-migrations (18/11/2026, dev)
+
+Tooling recense les dictionnaires JSON-compatibles `.ts` de chaque scope installé et des hôtes natifs (`system`) dans `backend/.symsvel/translation-sources.json` (schéma 1). Le module Languages est seul propriétaire de la persistance ; la commande locale `symsvel:languages:translations:sync`, orchestrée après migrations, valide intégralement le manifeste puis enregistre les clés `scope + module.key` et les textes dans une transaction DBAL. Les clés publiques suivent `<scope>.<module|system>.<key>`, sans double stockage du scope.
+
+Migration Schema `Version20261118000001` : la colonne `customized` vaut vrai par défaut sur les anciennes traductions, pour les protéger. Le synchroniseur inscrit les nouveaux textes source avec `customized=false` et ne met à jour que ces valeurs ; une édition BO ou un import CSV marque `customized=true`. Les langues inactives peuvent recevoir leurs textes de référence, mais demeurent non éditables depuis le BO jusqu'à leur activation ou préouverture. Les clés sans valeur sont néanmoins inscrites. La suppression BO d'une valeur rétablit la possibilité d'installer la valeur par défaut lors de la prochaine synchronisation.
+
+Ce mécanisme ne reconstruit pas les fichiers Svelte et ne publie rien en production ; Tooling reste chargé de la synchronisation des sources puis le build Git/CD incorpore les dictionnaires. Tests de migrations compilées PG/MySQL et crash-tests XT requis avant validation.

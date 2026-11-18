@@ -115,7 +115,7 @@ final readonly class TranslationCatalog
                     'scope' => $scope, 'translation_key' => $key, 'description' => null,
                 ]);
             }
-            $updated = $this->db->update('symsvel_translations', ['text_value' => $value], [
+            $updated = $this->db->update('symsvel_translations', ['text_value' => $value, 'customized' => true], [
                 'scope' => $scope, 'translation_key' => $key, 'language' => $language,
             ]);
             if ($updated === 0 && !$this->db->fetchOne(
@@ -124,6 +124,7 @@ final readonly class TranslationCatalog
             )) {
                 $this->db->insert('symsvel_translations', [
                     'scope' => $scope, 'translation_key' => $key, 'language' => $language, 'text_value' => $value,
+                    'customized' => true,
                 ]);
             }
         });
