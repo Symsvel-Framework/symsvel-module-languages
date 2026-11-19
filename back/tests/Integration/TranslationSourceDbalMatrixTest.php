@@ -22,7 +22,8 @@ final class TranslationSourceDbalMatrixTest extends TestCase
         if (!is_string($url) || $url === '') {
             self::markTestSkipped('Set SYMSVEL_LANGUAGES_TEST_DATABASE_URL for real-engine testing.');
         }
-        $db = DriverManager::getConnection(['url' => $url]);
+        $driver = str_starts_with($url, 'postgresql:') ? 'pdo_pgsql' : 'pdo_mysql';
+        $db = DriverManager::getConnection(['driver' => $driver, 'url' => $url]);
         $file = tempnam(sys_get_temp_dir(), 'symsvel-languages-matrix-');
         try {
             $schema = new Schema();
