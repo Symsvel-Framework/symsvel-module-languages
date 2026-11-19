@@ -72,3 +72,44 @@ jobs:
           npm run lint
           npm run build
           npm run test:unit -- --run
+
+  database-boolean-matrix:
+    runs-on: [self-hosted, linux, ARM64, symsvel]
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [postgres, mysql, mariadb]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify PHP 8.4 and PDO drivers
+        env:
+          ENGINE: ${{ matrix.engine }}
+        run: |
+          php -r '$driver = getenv("ENGINE") === "postgres" ? "pdo_pgsql" : "pdo_mysql"; if (PHP_VERSION_ID < 80400 || PHP_VERSION_ID >= 80500 || !extension_loaded($driver)) { fwrite(STDERR, "Missing PHP version or $driver\n"); exit(1); }'
+      - name: Install private dependencies
+        env:
+          SYMSVEL_READ_TOKEN: ${{ secrets.SYMSVEL_READ_TOKEN }}
+        run: |
+          if [ -z "$SYMSVEL_READ_TOKEN" ]; then echo "::error::SYMSVEL_READ_TOKEN missing"; exit 1; fi
+          export COMPOSER_AUTH="$(php -r 'echo json_encode(["github-oauth" => ["github.com" => getenv("SYMSVEL_READ_TOKEN")]], JSON_THROW_ON_ERROR);')"
+          composer install --no-interaction --prefer-dist --no-progress
+      - name: Exercise typed translation flags against a real database
+        env:
+          ENGINE: ${{ matrix.engine }}
+          SYMSVEL_CI_POSTGRES_PASSWORD: ${{ secrets.SYMSVEL_CI_POSTGRES_PASSWORD }}
+        run: |
+          if [ -z "$SYMSVEL_CI_POSTGRES_PASSWORD" ]; then echo "::error::Database secret missing"; exit 1; fi
+          case "$ENGINE" in
+            postgres)
+              export PGPASSWORD="$SYMSVEL_CI_POSTGRES_PASSWORD"
+              pg_isready -h postgres -U symsvel_ci -d postgres
+              dropdb --if-exists --force -h postgres -U symsvel_ci symsvel_languages_bool_ci
+              createdb -h postgres -U symsvel_ci symsvel_languages_bool_ci
+              export SYMSVEL_LANGUAGES_TEST_DATABASE_URL="$(php -r 'echo "postgresql://symsvel_ci:".rawurlencode(getenv("SYMSVEL_CI_POSTGRES_PASSWORD"))."@postgres:5432/symsvel_languages_bool_ci";')"
+              ;;
+            mysql|mariadb)
+              mysql --host="$ENGINE" --user=root --password="$SYMSVEL_CI_POSTGRES_PASSWORD" --execute='DROP DATABASE IF EXISTS symsvel_languages_bool_ci; CREATE DATABASE symsvel_languages_bool_ci'
+              export SYMSVEL_LANGUAGES_TEST_DATABASE_URL="$(php -r 'echo "mysql://root:".rawurlencode(getenv("SYMSVEL_CI_POSTGRES_PASSWORD"))."@".getenv("ENGINE").":3306/symsvel_languages_bool_ci";')"
+              ;;
+          esac
+          vendor/bin/phpunit -c back/phpunit.xml.dist back/tests/Integration/TranslationSourceDbalMatrixTest.php
