@@ -74,7 +74,7 @@ final readonly class BoTranslationsController
     {
         if (($error = $this->authorize($request, 'manage')) !== null) return $error;
         if (!str_starts_with(strtolower($request->headers->get('Content-Type', '')), 'application/json')
-            || strlen($request->getContent()) > 6000) return self::error(400);
+            || strlen($request->getContent()) > 12000) return self::error(400);
         try {
             $data = json_decode($request->getContent(), true, 4, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
