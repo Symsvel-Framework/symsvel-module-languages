@@ -94,3 +94,7 @@ Le composant Traductions utilise les jetons `--bo-*` pour les surfaces, champs, 
 ### Réponses asynchrones périmées (19/11/2026)
 
 Les chargements du catalogue et des clés utilisent des identifiants de requête : si l'administrateur change rapidement de langue, scope ou module, une réponse HTTP plus ancienne ne doit jamais remplacer la sélection courante. Les valeurs de secours restent visibles en référence lors de l'édition d'une autre langue que le français, même lorsque la traduction cible existe déjà. La validation de ligne demeure indépendante et ne déclenche aucune navigation.
+
+### Édition de ligne unique, sans modale (19/11/2026)
+
+La modale est désormais réservée à **Créer une clé**. Les traductions existantes et leur explication s'affichent d'abord comme textes. Cliquer **Éditer** remplace le texte de la ligne par des champs préremplis et les actions par **Valider / Annuler**. Une seule ligne peut être éditée simultanément, la clé reste toujours en lecture seule, et le `PATCH /apibo/languages/translations/keys` existant sauve en une transaction explication et valeur. En cas d'échec, les champs et leur saisie restent visibles. En cas de succès, la ligne et les compteurs sont actualisés sans reload ni perte de la sélection et du scroll. Le formulaire de création existant reste asynchrone et indépendant.

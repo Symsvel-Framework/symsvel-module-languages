@@ -5,6 +5,8 @@
   import Button from '../../../../../components/Button.svelte';
   import Alert from '../../../../../components/Alert.svelte';
   import Modal from '../../../../../components/Modal.svelte';
+  import Dropdown from '../../../../../components/Dropdown.svelte';
+  import { languageFlag } from '../../../../../components/dropdown';
   import { ApiError } from '../../../../../api/client';
   import { boApi } from '../../../../../api/session';
   import { uiLanguage } from '../../../../../api/locales';
@@ -26,9 +28,14 @@
 
   const locale = $derived($uiLanguage ?? (typeof navigator === 'undefined' ? 'fr' : navigator.language));
   const t = $derived(translationCopy(locale));
+  const interfaceCode = $derived(locale.trim().replace('_', '-').split('-')[0].toLowerCase());
   const base = '/apibo/languages/translations';
 
   let languages = $state<BoLanguage[]>([]);
+  const languageOptions = $derived(languages.map((row) => ({
+    value: row.iso_code, label: row.name,
+    code: row.iso_code.toUpperCase(), icon: languageFlag(row.iso_code)
+  })));
   let scope = $state<'bo' | 'app' | 'front'>('bo');
   let exportScope = $state<'bo' | 'app' | 'front'>('bo');
   let language = $state('');
@@ -47,8 +54,9 @@
   let value = $state('');
   let description = $state('');
   let editorOpen = $state(false);
-  let editingExisting = $state(false);
-  let drafts = $state<Record<string, string>>({});
+  let editingKey = $state('');
+  let editValue = $state('');
+  let editDescription = $state('');
   let savingRow = $state('');
   let canDeleteKeys = $state(false);
   let moduleLoadId = 0;
@@ -110,7 +118,7 @@
     key = '';
     value = '';
     description = '';
-    drafts = {};
+    editingKey = '';
     await loadEntries();
   }
 
@@ -118,7 +126,7 @@
     language = code;
     selectedModule = '';
     entries = [];
-    drafts = {};
+    editingKey = '';
     void loadModules();
   }
 
@@ -164,7 +172,6 @@
   }
 
   function newKey(): void {
-    editingExisting = false;
     key = '';
     value = '';
     description = '';
@@ -173,37 +180,48 @@
   }
 
   function edit(entry: Translation): void {
-    editingExisting = true;
-    key = entry.translation_key;
-    value = entry.value;
-    description = entry.description ?? '';
+    if (editingKey || busy || savingRow) return;
+    editingKey = entry.translation_key;
+    editValue = entry.value;
+    editDescription = entry.description ?? '';
     error = '';
-    editorOpen = true;
+    success = '';
+  }
+
+  function cancelEdit(): void {
+    if (savingRow) return;
+    editingKey = '';
+    editValue = '';
+    editDescription = '';
   }
 
   async function saveInline(entry: Translation): Promise<void> {
-    const next = drafts[entry.translation_key];
-    if (next === undefined || next === entry.value || savingRow || busy) return;
-    const expectedLanguage = language;
-    const expectedScope = scope;
-    const expectedModule = selectedModule;
+    if (editingKey !== entry.translation_key || savingRow || busy) return;
+    const nextValue = editValue;
+    const nextDescription = editDescription.trim() || null;
+    const requestedLanguage = language;
+    const requestedScope = scope;
+    const requestedModule = selectedModule;
     savingRow = entry.translation_key;
     error = '';
     success = '';
     try {
-      await boApi(base, {
-        method: 'PUT',
+      await boApi(base + '/keys', {
+        method: 'PATCH',
         body: JSON.stringify({
-          scope: expectedScope, language: expectedLanguage,
-          key: entry.translation_key, value: next
+          scope: requestedScope, language: requestedLanguage,
+          key: entry.translation_key, description: nextDescription, value: nextValue
         })
       });
-      if (scope === expectedScope && language === expectedLanguage && selectedModule === expectedModule) {
+      if (scope === requestedScope && language === requestedLanguage &&
+          selectedModule === requestedModule) {
         entries = entries.map((item) => item.translation_key === entry.translation_key
-          ? { ...item, value: next, missing_translation: next.trim() === '' } : item);
-        const pending = { ...drafts };
-        delete pending[entry.translation_key];
-        drafts = pending;
+          ? {
+              ...item, description: nextDescription, value: nextValue,
+              missing_translation: nextValue.trim() === ''
+            }
+          : item);
+        cancelEditAfterSave();
         await loadModules();
       }
       success = t.saved;
@@ -214,33 +232,29 @@
     }
   }
 
+  function cancelEditAfterSave(): void {
+    editingKey = '';
+    editValue = '';
+    editDescription = '';
+  }
+
   async function saveEditor(): Promise<void> {
     if (!language || !key.trim() || busy) return;
     busy = true;
     error = '';
     success = '';
-    const fullKey = ownedKey();
     try {
-      if (editingExisting) {
-        await boApi(base + '/keys', {
-          method: 'PATCH',
-          body: JSON.stringify({
-            scope, key: fullKey, language, description: description.trim() || null, value
-          })
-        });
-      } else {
-        await boApi(base + '/keys', {
-          method: 'POST',
-          body: JSON.stringify({
-            scope, key: fullKey, description: description.trim() || null,
-            language, value
-          })
-        });
-      }
+      await boApi(base + '/keys', {
+        method: 'POST',
+        body: JSON.stringify({
+          scope, key: ownedKey(), description: description.trim() || null,
+          language, value
+        })
+      });
       editorOpen = false;
       await loadEntries();
       await loadModules();
-      success = editingExisting ? t.saved : t.keyCreated;
+      success = t.keyCreated;
     } catch (cause) {
       error = explain(cause);
     } finally {
@@ -257,9 +271,7 @@
       const query = 'scope=' + encodeURIComponent(scope) + '&key=' + encodeURIComponent(entry.translation_key);
       await boApi(base + '/keys?' + query, { method: 'DELETE' });
       entries = entries.filter((row) => row.translation_key !== entry.translation_key);
-      const pending = { ...drafts };
-      delete pending[entry.translation_key];
-      drafts = pending;
+      if (editingKey === entry.translation_key) cancelEditAfterSave();
       await loadModules();
       success = t.keyDeleted;
     } catch (cause) {
