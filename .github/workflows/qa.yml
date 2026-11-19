@@ -74,6 +74,10 @@ jobs:
           npm run test:unit -- --run
 
   database-boolean-matrix:
+    # Shared Docker databases on the two local runners must be reset serially.
+    concurrency:
+      group: symsvel-languages-boolean-${{ matrix.engine }}
+      cancel-in-progress: false
     runs-on: [self-hosted, linux, ARM64, symsvel]
     strategy:
       fail-fast: false

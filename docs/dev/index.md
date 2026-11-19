@@ -255,3 +255,5 @@ La première exécution du job multi-SGBD a révélé que la version DBAL 4 util
 Le paramétrage du test multi-SGBD fournit explicitement `host`, `port`, `user`, `password` et `dbname` à `DriverManager` après analyse de l'URL du runner. La connexion de test n'utilise plus l'option URL implicite, non développée dans cette version de DBAL 4, qui tentait à tort le socket local.
 
 Lint : correction du namespace PHP `\\RuntimeException` introduit lors de l'ajustement de la fixture. Ce changement ne modifie pas les écritures SQL de production.
+
+Les jobs de la matrice utilisent une concurrence sérialisée par moteur (`symsvel-languages-boolean-<engine>`) afin d'empêcher deux workflows de réinitialiser simultanément le même SGBDR partagé par les runners locaux.
