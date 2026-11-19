@@ -269,3 +269,7 @@ La suppression de clé globale est différente de la suppression historique d'un
 La création atomique valide désormais la langue et la taille du texte avant toute insertion. La mise à jour PATCH refuse toute propriété non documentée et exige la description, même nulle, tandis que l'identité `scope/key` est non modifiable. Un test du contrôleur vérifie que `ROLE_SUPER_ADMIN` reçoit 403 sur une suppression globale de clé, mais `ROLE_DEV` y accède ; masquer le bouton dans le BO ne constitue pas une protection suffisante.
 
 La création atomique peut désormais inclure une première valeur de traduction (`value` limité à 8192 octets). L'endpoint POST tolère 12 000 octets de JSON, comme l'endpoint PATCH, tout en rejetant les charges excessives avant `json_decode` : l'ancienne borne de 6000 octets concernait la création sans valeur.
+
+### CI des PR et bases locales (19/11/2026)
+
+Après l'ouverture d'une PR draft, les pushes de sa branche sont validés par le seul événement `pull_request` ciblant `dev`/`main`. Les pushes directs sur `dev` et `main` gardent leur CI. Cette séparation évite de lancer deux matrices SQL concurrentes sur les runners locaux pour chaque commit de PR. Le job `database-boolean-matrix` conserve son verrou par moteur pour protéger ses bases temporaires partagées. Les vérifications de la branche avant ouverture de PR se font sur les tests locaux ou après création de la PR draft.
