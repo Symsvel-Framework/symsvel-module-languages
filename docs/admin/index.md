@@ -86,3 +86,7 @@ Le module Languages déclare et traduit dans ses propres dictionnaires les texte
 ### Hiérarchie des panneaux (19/11/2026)
 
 Le rendu présente désormais une sélection de langue persistante, un panneau Import/Export, les modules et leur taux de traduction, puis le tableau éditable du module. Le formulaire de création ou modification se trouve dans la modale native BO. Les valeurs existantes sont modifiées directement dans les cellules ; seules les valeurs changées affichent Enregistrer. Les actions sauvegardent par API sans rechargement ni retour forcé à la liste.
+
+### Styles du module (19/11/2026)
+
+Le composant Traductions utilise les jetons `--bo-*` pour les surfaces, champs, textes secondaires, focus, tableaux et statuts. Les fallbacks CSS permettent son assemblage avec un BO antérieur pendant les CI isolées ; le Design System BO devient la source des couleurs une fois synchronisé. La présentation conserve la hiérarchie HP (cartes modules, tableaux, modale) sans ajouter une bibliothèque UI.
