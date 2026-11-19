@@ -257,3 +257,9 @@ Le paramétrage du test multi-SGBD fournit explicitement `host`, `port`, `user`,
 Lint : correction du namespace PHP `\\RuntimeException` introduit lors de l'ajustement de la fixture. Ce changement ne modifie pas les écritures SQL de production.
 
 Les jobs de la matrice utilisent une concurrence sérialisée par moteur (`symsvel-languages-boolean-<engine>`) afin d'empêcher deux workflows de réinitialiser simultanément le même SGBDR partagé par les runners locaux.
+
+### API pour l'UX HP des traductions (19/11/2026)
+
+La modale de création utilise désormais un seul `POST /apibo/languages/translations/keys` acceptant facultativement `language` et `value` pour créer la clé, sa description et son texte initial de manière atomique. Une modification de clé utilise `PATCH` sur ce même endpoint : `scope` et `key` restent l'identité immuable, seules la description et la valeur de la langue choisie sont modifiées. L'édition directe d'une traduction conserve `PUT /apibo/languages/translations`.
+
+La suppression de clé globale est différente de la suppression historique d'une valeur : `DELETE /apibo/languages/translations/keys?scope=...&key=...` efface toutes ses langues, avec décision de rôle `ROLE_DEV` contrôlée côté API via `BoAccessGate`. `csv-capabilities` expose `can_delete_keys` pour l'affichage, mais ce drapeau ne remplace jamais le contrôle serveur. Attention : une clé appartenant à un dictionnaire module sera réintroduite lors d'une synchronisation des sources ; l'interface doit le signaler explicitement. Test SQLite : création atomique, clé immuable, édition et suppression multilangue.

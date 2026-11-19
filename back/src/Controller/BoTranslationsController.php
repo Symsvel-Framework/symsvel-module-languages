@@ -83,11 +83,70 @@ final readonly class BoTranslationsController
         if (!is_array($data) || array_is_list($data)
             || !is_string($data['scope'] ?? null) || !is_string($data['key'] ?? null)
             || (array_key_exists('description', $data) && !is_string($data['description']) && $data['description'] !== null)
-            || count($data) > 3 || count($data) < 2) return self::error(400);
+            || (array_key_exists('language', $data) && !is_string($data['language']))
+            || (array_key_exists('value', $data) && !is_string($data['value']))
+            || count($data) > 5 || count($data) < 2
+            || (array_key_exists('language', $data) !== array_key_exists('value', $data))) return self::error(400);
         try {
+            if (isset($data['language'], $data['value'])) {
+                $this->translations->registerWithValue(
+                    $data['scope'], $data['key'], $data['description'] ?? null,
+                    $data['language'], $data['value'],
+                );
+                return self::reply(['data' => ['scope' => $data['scope'], 'translation_key' => $data['key']]], 201);
+            }
             return self::reply(['data' => $this->translations->registerKey(
                 $data['scope'], $data['key'], $data['description'] ?? null,
             )], 201);
+        } catch (\InvalidArgumentException) {
+            return self::error(400);
+        } catch (\DomainException) {
+            return self::error(409);
+        }
+    }
+
+    #[Route('/apibo/languages/translations/keys', name: 'symsvel_languages_translations_key_update', methods: ['PATCH'], format: 'json')]
+    public function updateKey(Request $request): JsonResponse
+    {
+        if (($error = $this->authorize($request, 'manage')) !== null) return $error;
+        if (!str_starts_with(strtolower($request->headers->get('Content-Type', '')), 'application/json')
+            || strlen($request->getContent()) > 12000) return self::error(400);
+        try {
+            $data = json_decode($request->getContent(), true, 4, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return self::error(400);
+        }
+        if (!is_array($data) || array_is_list($data) || count($data) !== 5
+            || !is_string($data['scope'] ?? null) || !is_string($data['key'] ?? null)
+            || (!is_string($data['description'] ?? null) && ($data['description'] ?? null) !== null)
+            || !is_string($data['language'] ?? null) || !is_string($data['value'] ?? null)) {
+            return self::error(400);
+        }
+        try {
+            $this->translations->updateKeyWithValue(
+                $data['scope'], $data['key'], $data['description'], $data['language'], $data['value'],
+            );
+            return self::reply(['status' => 'updated']);
+        } catch (\InvalidArgumentException) {
+            return self::error(400);
+        } catch (\DomainException) {
+            return self::error(409);
+        }
+    }
+
+    /** A key is global across languages: only the developer may destroy it. */
+    #[Route('/apibo/languages/translations/keys', name: 'symsvel_languages_translations_key_delete', methods: ['DELETE'], format: 'json')]
+    public function deleteKey(Request $request): JsonResponse
+    {
+        $decision = $this->gate->check($request, 'languages', 'list');
+        if (!$decision->allowed()) return self::error($decision->status);
+        if ($decision->roleCode !== 'ROLE_DEV') return self::error(403);
+        $scope = $request->query->get('scope');
+        $key = $request->query->get('key');
+        if (!is_string($scope) || !is_string($key)) return self::error(400);
+        try {
+            $this->translations->deleteKey($scope, $key);
+            return self::reply(['status' => 'deleted']);
         } catch (\InvalidArgumentException) {
             return self::error(400);
         } catch (\DomainException) {
@@ -162,6 +221,7 @@ final readonly class BoTranslationsController
         $canManage = $this->gate->check($request, 'languages', 'manage')->allowed();
         return self::reply(['data' => [
             'can_export' => $canManage,
+            'can_delete_keys' => $this->gate->check($request, 'languages', 'list')->roleCode === 'ROLE_DEV',
             'can_import' => $canManage && in_array($this->environment, ['dev', 'test'], true)
                 && $this->isLocal($request),
             'can_publish' => $canManage && $this->environment === 'dev' && $this->isLocal($request)

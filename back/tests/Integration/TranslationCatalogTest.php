@@ -180,6 +180,31 @@ final class TranslationCatalogTest extends TestCase
         }
     }
 
+    public function testHpStyleModalKeepsKeyImmutableAndDeveloperDeletionRemovesAllLanguages(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $translations->registerWithValue('bo', 'admins.example', 'Ancienne description', 'fr', 'Texte initial');
+            self::assertSame('Texte initial', $translations->entries('bo', 'fr', 'admins')[0]['value']);
+            $translations->save('bo', 'en', 'admins.example', 'English text');
+            $translations->updateKeyWithValue('bo', 'admins.example', 'Nouvelle description', 'fr', 'Texte modifié');
+            $rows = $translations->entries('bo', 'fr', 'admins');
+            self::assertSame('admins.example', $rows[0]['translation_key']);
+            self::assertSame('Nouvelle description', $rows[0]['description']);
+            self::assertSame('Texte modifié', $rows[0]['value']);
+            self::assertSame('English text', $translations->entries('bo', 'en', 'admins')[0]['value']);
+            $translations->deleteKey('bo', 'admins.example');
+            self::assertSame([], $translations->entries('bo', 'fr', 'admins'));
+            self::assertSame([], $translations->entries('bo', 'en', 'admins'));
+            self::assertSame(0, (int) $db->fetchOne(
+                'SELECT COUNT(*) FROM symsvel_translation_keys WHERE translation_key = ?',
+                ['admins.example'],
+            ));
+        } finally {
+            $db->close();
+        }
+    }
+
     public function testLegacyBoComponentsCustomizationsSurviveSystemNamespace(): void
     {
         [$translations, , $db] = $this->catalog();
