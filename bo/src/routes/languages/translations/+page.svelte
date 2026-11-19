@@ -4,6 +4,7 @@
   import { resolve } from '$app/paths';
   import Button from '../../../../../components/Button.svelte';
   import Alert from '../../../../../components/Alert.svelte';
+  import Modal from '../../../../../components/Modal.svelte';
   import { ApiError } from '../../../../../api/client';
   import { boApi } from '../../../../../api/session';
   import { uiLanguage } from '../../../../../api/locales';
@@ -29,6 +30,7 @@
 
   let languages = $state<BoLanguage[]>([]);
   let scope = $state<'bo' | 'app' | 'front'>('bo');
+  let exportScope = $state<'bo' | 'app' | 'front'>('bo');
   let language = $state('');
   let entries = $state<Translation[]>([]);
   let progress = $state<ModuleProgress | null>(null);
@@ -44,6 +46,11 @@
   let key = $state('');
   let value = $state('');
   let description = $state('');
+  let editorOpen = $state(false);
+  let editingExisting = $state(false);
+  let drafts = $state<Record<string, string>>({});
+  let savingRow = $state('');
+  let canDeleteKeys = $state(false);
   let csvCanExport = $state(false);
   let csvCanImport = $state(false);
   let canPublish = $state(false);
@@ -95,6 +102,7 @@
     key = '';
     value = '';
     description = '';
+    drafts = {};
     await loadEntries();
   }
 
@@ -102,6 +110,7 @@
     language = code;
     selectedModule = '';
     entries = [];
+    drafts = {};
     void loadModules();
   }
 
@@ -113,10 +122,11 @@
       languages = result.data;
       language = result.data.find((row) => row.primary)?.iso_code ?? result.data[0]?.iso_code ?? '';
       if (language) await loadModules();
-      const caps = await boApi<{ data: { can_export: boolean; can_import: boolean; can_publish: boolean } }>(`${base}/csv-capabilities`);
+      const caps = await boApi<{ data: { can_export: boolean; can_import: boolean; can_publish: boolean; can_delete_keys?: boolean } }>(`${base}/csv-capabilities`);
       csvCanExport = caps.data.can_export;
       csvCanImport = caps.data.can_import;
       canPublish = caps.data.can_publish;
+      canDeleteKeys = caps.data.can_delete_keys === true;
     } catch (cause) {
       error = explain(cause);
     } finally {
@@ -138,65 +148,105 @@
     }
   }
 
+  function newKey(): void {
+    editingExisting = false;
+    key = '';
+    value = '';
+    description = '';
+    error = '';
+    editorOpen = true;
+  }
+
   function edit(entry: Translation): void {
+    editingExisting = true;
     key = entry.translation_key;
     value = entry.value;
     description = entry.description ?? '';
-    success = '';
+    error = '';
+    editorOpen = true;
   }
 
-  async function createKey(): Promise<void> {
-    if (!key.trim() || busy || !language) return;
-    busy = true;
+  async function saveInline(entry: Translation): Promise<void> {
+    const next = drafts[entry.translation_key];
+    if (next === undefined || next === entry.value || savingRow || busy) return;
+    const expectedLanguage = language;
+    const expectedScope = scope;
+    const expectedModule = selectedModule;
+    savingRow = entry.translation_key;
     error = '';
     success = '';
     try {
-      await boApi(`${base}/keys`, {
-        method: 'POST',
-        body: JSON.stringify({ scope, key: ownedKey(), description: description.trim() || null })
+      await boApi(base, {
+        method: 'PUT',
+        body: JSON.stringify({
+          scope: expectedScope, language: expectedLanguage,
+          key: entry.translation_key, value: next
+        })
       });
-      await loadEntries();
-      await loadModules();
-      success = t.keyCreated;
-    } catch (cause) {
-      error = explain(cause);
-    } finally {
-      busy = false;
-    }
-  }
-
-  async function save(): Promise<void> {
-    if (!language || !key.trim() || busy) return;
-    busy = true;
-    error = '';
-    success = '';
-    try {
-      await boApi<{ data: Translation }>(base, {
-        method: 'PUT', body: JSON.stringify({ scope, language, key: ownedKey(), value })
-      });
-      await loadEntries();
-      await loadModules();
+      if (scope === expectedScope && language === expectedLanguage && selectedModule === expectedModule) {
+        entries = entries.map((item) => item.translation_key === entry.translation_key
+          ? { ...item, value: next, missing_translation: next.trim() === '' } : item);
+        const pending = { ...drafts };
+        delete pending[entry.translation_key];
+        drafts = pending;
+        await loadModules();
+      }
       success = t.saved;
     } catch (cause) {
       error = explain(cause);
     } finally {
+      savingRow = '';
+    }
+  }
+
+  async function saveEditor(): Promise<void> {
+    if (!language || !key.trim() || busy) return;
+    busy = true;
+    error = '';
+    success = '';
+    const fullKey = ownedKey();
+    try {
+      if (editingExisting) {
+        await boApi(base + '/keys', {
+          method: 'PATCH',
+          body: JSON.stringify({
+            scope, key: fullKey, language, description: description.trim() || null, value
+          })
+        });
+      } else {
+        await boApi(base + '/keys', {
+          method: 'POST',
+          body: JSON.stringify({
+            scope, key: fullKey, description: description.trim() || null,
+            language, value
+          })
+        });
+      }
+      editorOpen = false;
+      await loadEntries();
+      await loadModules();
+      success = editingExisting ? t.saved : t.keyCreated;
+    } catch (cause) {
+      error = explain(cause);
+    } finally {
       busy = false;
     }
   }
 
-  async function remove(): Promise<void> {
-    if (!language || !key || busy || !confirm(t.confirmDelete)) return;
+  async function removeKey(entry: Translation): Promise<void> {
+    if (!canDeleteKeys || busy || savingRow || !confirm(t.confirmDeleteKey)) return;
     busy = true;
     error = '';
     success = '';
     try {
-      await boApi(`${base}?${params(true)}`, { method: 'DELETE' });
-      key = '';
-      value = '';
-      description = '';
-      await loadEntries();
+      const query = 'scope=' + encodeURIComponent(scope) + '&key=' + encodeURIComponent(entry.translation_key);
+      await boApi(base + '/keys?' + query, { method: 'DELETE' });
+      entries = entries.filter((row) => row.translation_key !== entry.translation_key);
+      const pending = { ...drafts };
+      delete pending[entry.translation_key];
+      drafts = pending;
       await loadModules();
-      success = t.deleted;
+      success = t.keyDeleted;
     } catch (cause) {
       error = explain(cause);
     } finally {
@@ -210,7 +260,7 @@
     error = '';
     success = '';
     try {
-      const result = await boApi<{ data: TsExport }>(`${base}/export?${params()}`);
+      const result = await boApi<{ data: TsExport }>(`${base}/export?scope=${encodeURIComponent(exportScope)}&language=${encodeURIComponent(language)}`);
       saveBlob(result.data.content, result.data.filename, 'text/typescript;charset=utf-8');
       success = t.generated;
     } catch (cause) {
@@ -240,7 +290,7 @@
     try {
       const result = await boApi<{ data: { file: string; changed: boolean; entries: number } }>(
         `${base}/publish`,
-        { method: 'POST', body: JSON.stringify({ scope, language }) }
+        { method: 'POST', body: JSON.stringify({ scope: exportScope, language }) }
       );
       success = result.data.changed ? `${t.tsPublished}: ${result.data.file}` : t.tsUnchanged;
     } catch (cause) {

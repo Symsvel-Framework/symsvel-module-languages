@@ -74,3 +74,7 @@ Lorsqu'un module n'a de traductions que dans un seul scope (par exemple BO), l'�
 
 
 **Publication TypeScript :** le fichier local généré à partir du BO ne contient que les traductions volontairement personnalisées. Les textes livrés avec un module restent dans son propre dictionnaire, mis à jour par Tooling ; un fichier généré ne les fige donc pas. Le téléchargement de l'export complet reste disponible séparément, avec fallbacks, pour les échanges ou l'audit.
+
+### Parcours HP : état de l'éditeur (19/11/2026)
+
+L'écran maintient la langue, le module et le scope comme états Svelte distincts. La création et la modification utilisent une modale commune ; le nom de clé n'est plus modifiable en mode édition. Chaque ligne possède un brouillon de traduction indépendant ; sa validation actualise la ligne et réinterroge les compteurs, sans navigation ni perte de scroll. Import/export ont une interface cible distincte. La suppression de clé n'est affichée qu'avec la capacité DEV renvoyée par le backend.
