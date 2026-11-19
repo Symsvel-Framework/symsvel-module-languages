@@ -38,12 +38,14 @@
   const actions = $derived<DataAction<BoLanguage>[]>([
     {
       key: 'active',
+      variant: (language) => language.active ? 'warning' : 'success',
       label: (language) => `${t.publicState}: ${language.active ? t.yes : t.no}`,
       disabled: (language) => saving !== '' || (language.primary && language.active),
       onClick: (language) => { void toggle(language, 'active'); }
     },
     {
       key: 'pre_open',
+      variant: (language) => language.pre_open ? 'warning' : 'success',
       label: (language) => `${t.preOpenState}: ${language.pre_open ? t.yes : t.no}`,
       disabled: () => saving !== '',
       onClick: (language) => { void toggle(language, 'pre_open'); }

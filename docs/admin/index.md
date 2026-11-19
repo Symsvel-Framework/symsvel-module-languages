@@ -118,3 +118,10 @@ L'édition et la validation en ligne conservent la page, les filtres et le scrol
 ### Design System BO : passe du 19/11/2026
 
 La liste des langues, déjà affichée via `DataTable` et `Pagination`, conserve recherche, tri, actions et sauvegardes asynchrones. Son panneau et ses textes secondaires utilisent les jetons `--bo-surface`, `--bo-text`, `--bo-border` et `--bo-muted` du Design System commun pour respecter les thèmes clair/sombre. Aucun changement d'API, d'ACL ni de logique métier. CI et CT XT exigés avant clôture.
+
+### Conventions de couleur des actions (19/11/2026)
+
+Activation et préouverture de langue : vert pour activer, orange pour désactiver. La langue principale non désactivable reste en état gris indisponible.
+La finalité est portée par `DataAction.variant` et `Button.variant`, pas par le libellé traduit.
+Les jetons et le thème clair/sombre restent dans le Design System BO.
+Voir `symsvel-bo/docs/dev/bo-components.md`. Tests CI et CT XT nécessaires.
