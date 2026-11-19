@@ -26,6 +26,10 @@ describe('Languages BO', () => {
     expect(translationCopy('en').createKey).toBe('Create key');
     expect(translationCopy('fr').keyLocked).toContain('ne peut pas');
     expect(translationCopy('en').deleteKey).toBe('Delete key');
+    expect(translationCopy('fr').interfaceLanguage).toBe("Langue d'interface");
+    expect(translationCopy('fr').editingIn).toBe('Éditer en');
+    expect(translationCopy('fr').validate).toBe('Valider');
+    expect(translationCopy('en').validate).toBe('Confirm');
     expect(translationCopy('es').title).toBe('Traductions');
   });
   it('filters, sorts and localizes', () => {

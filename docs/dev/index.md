@@ -273,3 +273,7 @@ La création atomique peut désormais inclure une première valeur de traduction
 ### CI des PR et bases locales (19/11/2026)
 
 Après l'ouverture d'une PR draft, les pushes de sa branche sont validés par le seul événement `pull_request` ciblant `dev`/`main`. Les pushes directs sur `dev` et `main` gardent leur CI. Cette séparation évite de lancer deux matrices SQL concurrentes sur les runners locaux pour chaque commit de PR. Le job `database-boolean-matrix` conserve son verrou par moteur pour protéger ses bases temporaires partagées. Les vérifications de la branche avant ouverture de PR se font sur les tests locaux ou après création de la PR draft.
+
+### Contrat UX HP : libellés de contexte et validation inline (19/11/2026)
+
+La page Traductions affiche deux langues indépendantes : `uiLanguage` pour **Langue d'interface** et le code sélectionné pour **Éditer en**. Les nouveaux libellés `bo.languages.editor.interfaceLanguage`, `editingIn` et `validate` sont fournis par les dictionnaires FR/EN du module et testés avec `translationCopy`. La validation d'une ligne existante utilise `PATCH /apibo/languages/translations/keys` pour la description et la valeur de la langue courante ; le formulaire de création reste une modale et appelle toujours `POST`. Le composant Dropdown est un élément partagé du BO, pas une dépendance PHP ni une copie dans Languages.

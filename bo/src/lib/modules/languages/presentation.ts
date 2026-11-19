@@ -58,6 +58,9 @@ export function filterLanguages(
 
 const translationLabels = {
   fr: {
+    interfaceLanguage: "Langue d'interface",
+    editingIn: "Éditer en",
+    validate: "Valider",
     languageHint: "Choisissez la langue à traduire, même si une seule langue est active.",
     importExport: "Import / Export",
     loading: "Chargement des traductions…",
@@ -88,6 +91,9 @@ const translationLabels = {
     failure: 'Impossible de traiter les traductions.'
   },
   en: {
+    interfaceLanguage: "Interface language",
+    editingIn: "Editing in",
+    validate: "Confirm",
     languageHint: "Choose the language to translate, even if only one language is active.",
     importExport: "Import / Export",
     loading: "Loading translations…",
