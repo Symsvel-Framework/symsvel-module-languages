@@ -253,3 +253,5 @@ Le job CI `database-boolean-matrix` utilise les SGBDR locaux existants (PostgreS
 La première exécution du job multi-SGBD a révélé que la version DBAL 4 utilisée dans les runners exige le champ `driver` explicite lors de la création de la connexion de test. Le test sélectionne désormais `pdo_pgsql` pour l'URL PostgreSQL et `pdo_mysql` pour MySQL/MariaDB, sans changer la connexion applicative ni le code métier.
 
 Le paramétrage du test multi-SGBD fournit explicitement `host`, `port`, `user`, `password` et `dbname` à `DriverManager` après analyse de l'URL du runner. La connexion de test n'utilise plus l'option URL implicite, non développée dans cette version de DBAL 4, qui tentait à tort le socket local.
+
+Lint : correction du namespace PHP `\\RuntimeException` introduit lors de l'ajustement de la fixture. Ce changement ne modifie pas les écritures SQL de production.

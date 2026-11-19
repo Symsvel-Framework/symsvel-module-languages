@@ -24,7 +24,7 @@ final class TranslationSourceDbalMatrixTest extends TestCase
         }
         $connection = parse_url($url);
         if (!is_array($connection) || !isset($connection['host'], $connection['user'], $connection['path'])) {
-            throw new \\RuntimeException('Invalid test database connection URL.');
+            throw new \RuntimeException('Invalid test database connection URL.');
         }
         $db = DriverManager::getConnection([
             'driver' => $connection['scheme'] === 'postgresql' ? 'pdo_pgsql' : 'pdo_mysql',
