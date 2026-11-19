@@ -98,3 +98,9 @@ Les chargements du catalogue et des clés utilisent des identifiants de requête
 ### Édition de ligne unique, sans modale (19/11/2026)
 
 La modale est désormais réservée à **Créer une clé**. Les traductions existantes et leur explication s'affichent d'abord comme textes. Cliquer **Éditer** remplace le texte de la ligne par des champs préremplis et les actions par **Valider / Annuler**. Une seule ligne peut être éditée simultanément, la clé reste toujours en lecture seule, et le `PATCH /apibo/languages/translations/keys` existant sauve en une transaction explication et valeur. En cas d'échec, les champs et leur saisie restent visibles. En cas de succès, la ligne et les compteurs sont actualisés sans reload ni perte de la sélection et du scroll. Le formulaire de création existant reste asynchrone et indépendant.
+
+### Bandeau HP et dropdown partagé (19/11/2026)
+
+Le bandeau de traduction est désormais une composition du `AdminLanguageBar` HP : deux lignes sur la gauche, **LANGUE D'INTERFACE** (prise dans `uiLanguage` du BO) et **ÉDITER EN** (langue cible du catalogue), chaque ligne indiquant drapeau + code ISO. À droite, le Dropdown partagé du BO affiche nom de langue, drapeau, code et chevron. Le choix reste accessible même lorsque la seule langue active est la langue principale ; il ne modifie pas la langue d'interface. Les deux sélecteurs d'interface (export `.ts` et scope module) utilisent aussi ce Dropdown réutilisable. Les drapeaux proviennent du mapping vérifié dans `bo HP(2).zip`.
+
+Sur une ligne, l'état initial est **du texte**, sans champ de saisie ni modale d'édition. Le bouton Éditer passe seulement cette ligne en mode saisie, avec explication et valeur préremplies, et remplace les actions par Valider / Annuler. Les autres lignes restent consultables. La clé n'est jamais éditable. La création reste dans la modale.
