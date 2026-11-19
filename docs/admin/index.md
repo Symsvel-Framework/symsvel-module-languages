@@ -90,3 +90,7 @@ Le rendu présente désormais une sélection de langue persistante, un panneau I
 ### Styles du module (19/11/2026)
 
 Le composant Traductions utilise les jetons `--bo-*` pour les surfaces, champs, textes secondaires, focus, tableaux et statuts. Les fallbacks CSS permettent son assemblage avec un BO antérieur pendant les CI isolées ; le Design System BO devient la source des couleurs une fois synchronisé. La présentation conserve la hiérarchie HP (cartes modules, tableaux, modale) sans ajouter une bibliothèque UI.
+
+### Réponses asynchrones périmées (19/11/2026)
+
+Les chargements du catalogue et des clés utilisent des identifiants de requête : si l'administrateur change rapidement de langue, scope ou module, une réponse HTTP plus ancienne ne doit jamais remplacer la sélection courante. Les valeurs de secours restent visibles en référence lors de l'édition d'une autre langue que le français, même lorsque la traduction cible existe déjà. La validation de ligne demeure indépendante et ne déclenche aucune navigation.

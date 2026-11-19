@@ -51,6 +51,8 @@
   let drafts = $state<Record<string, string>>({});
   let savingRow = $state('');
   let canDeleteKeys = $state(false);
+  let moduleLoadId = 0;
+  let entryLoadId = 0;
   let csvCanExport = $state(false);
   let csvCanImport = $state(false);
   let canPublish = $state(false);
@@ -87,11 +89,17 @@
   }
 
   async function loadModules(): Promise<void> {
-    if (!language) { progress = null; return; }
+    const id = ++moduleLoadId;
+    const requestedLanguage = language;
+    if (!requestedLanguage) { progress = null; return; }
     try {
-      const result = await boApi<{ data: ModuleProgress }>(`${base}/modules?language=${encodeURIComponent(language)}`);
-      progress = result.data;
-    } catch (cause) { error = explain(cause); }
+      const result = await boApi<{ data: ModuleProgress }>(
+        base + '/modules?language=' + encodeURIComponent(requestedLanguage)
+      );
+      if (id === moduleLoadId && requestedLanguage === language) progress = result.data;
+    } catch (cause) {
+      if (id === moduleLoadId) error = explain(cause);
+    }
   }
 
   async function openModule(module: ModuleSummary): Promise<void> {
@@ -135,16 +143,23 @@
   }
 
   async function loadEntries(): Promise<void> {
-    if (!language || !selectedModule) { entries = []; return; }
+    const id = ++entryLoadId;
+    const requestedLanguage = language;
+    const requestedScope = scope;
+    const requestedModule = selectedModule;
+    if (!requestedLanguage || !requestedModule) { entries = []; return; }
     busy = true;
     error = '';
     try {
-      const result = await boApi<{ data: Translation[] }>(`${base}?${params()}`);
-      entries = result.data;
+      const result = await boApi<{ data: Translation[] }>(base + '?' + params());
+      if (id === entryLoadId && requestedLanguage === language &&
+          requestedScope === scope && requestedModule === selectedModule) {
+        entries = result.data;
+      }
     } catch (cause) {
-      error = explain(cause);
+      if (id === entryLoadId) error = explain(cause);
     } finally {
-      busy = false;
+      if (id === entryLoadId) busy = false;
     }
   }
 
@@ -495,7 +510,7 @@
                         drafts = { ...drafts, [entry.translation_key]: event.currentTarget.value };
                       }}
                       disabled={busy || (!!savingRow && savingRow !== entry.translation_key)}></textarea>
-                    {#if entry.missing_translation && entry.fallback_value}
+                    {#if entry.fallback_value && (entry.missing_translation || language !== 'fr')}
                       <small>{t.fallback}: {entry.fallback_value}</small>
                     {/if}
                   </td>
