@@ -84,6 +84,9 @@ export default {
     "translatedCount": "translated keys",
     "noKeys": "No declared keys",
     "searchTranslations": "Search translations",
-    "missingOnly": "Show missing only"
+    "missingOnly": "Show missing only",
+    "interfaceLanguage": "Interface language",
+    "editingIn": "Editing in",
+    "validate": "Confirm"
   }
 } as const;

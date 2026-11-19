@@ -5,6 +5,8 @@
   import Button from '../../../../../components/Button.svelte';
   import Alert from '../../../../../components/Alert.svelte';
   import Modal from '../../../../../components/Modal.svelte';
+  import Dropdown from '../../../../../components/Dropdown.svelte';
+  import { languageFlag } from '../../../../../components/dropdown';
   import { ApiError } from '../../../../../api/client';
   import { boApi } from '../../../../../api/session';
   import { uiLanguage } from '../../../../../api/locales';
@@ -26,9 +28,14 @@
 
   const locale = $derived($uiLanguage ?? (typeof navigator === 'undefined' ? 'fr' : navigator.language));
   const t = $derived(translationCopy(locale));
+  const interfaceCode = $derived(locale.trim().replace('_', '-').split('-')[0].toLowerCase());
   const base = '/apibo/languages/translations';
 
   let languages = $state<BoLanguage[]>([]);
+  const languageOptions = $derived(languages.map((row) => ({
+    value: row.iso_code, label: row.name,
+    code: row.iso_code.toUpperCase(), icon: languageFlag(row.iso_code)
+  })));
   let scope = $state<'bo' | 'app' | 'front'>('bo');
   let exportScope = $state<'bo' | 'app' | 'front'>('bo');
   let language = $state('');
@@ -47,8 +54,9 @@
   let value = $state('');
   let description = $state('');
   let editorOpen = $state(false);
-  let editingExisting = $state(false);
-  let drafts = $state<Record<string, string>>({});
+  let editingKey = $state('');
+  let editValue = $state('');
+  let editDescription = $state('');
   let savingRow = $state('');
   let canDeleteKeys = $state(false);
   let moduleLoadId = 0;
@@ -110,7 +118,7 @@
     key = '';
     value = '';
     description = '';
-    drafts = {};
+    editingKey = '';
     await loadEntries();
   }
 
@@ -118,7 +126,7 @@
     language = code;
     selectedModule = '';
     entries = [];
-    drafts = {};
+    editingKey = '';
     void loadModules();
   }
 
@@ -164,7 +172,6 @@
   }
 
   function newKey(): void {
-    editingExisting = false;
     key = '';
     value = '';
     description = '';
@@ -173,37 +180,48 @@
   }
 
   function edit(entry: Translation): void {
-    editingExisting = true;
-    key = entry.translation_key;
-    value = entry.value;
-    description = entry.description ?? '';
+    if (editingKey || busy || savingRow) return;
+    editingKey = entry.translation_key;
+    editValue = entry.value;
+    editDescription = entry.description ?? '';
     error = '';
-    editorOpen = true;
+    success = '';
+  }
+
+  function cancelEdit(): void {
+    if (savingRow) return;
+    editingKey = '';
+    editValue = '';
+    editDescription = '';
   }
 
   async function saveInline(entry: Translation): Promise<void> {
-    const next = drafts[entry.translation_key];
-    if (next === undefined || next === entry.value || savingRow || busy) return;
-    const expectedLanguage = language;
-    const expectedScope = scope;
-    const expectedModule = selectedModule;
+    if (editingKey !== entry.translation_key || savingRow || busy) return;
+    const nextValue = editValue;
+    const nextDescription = editDescription.trim() || null;
+    const requestedLanguage = language;
+    const requestedScope = scope;
+    const requestedModule = selectedModule;
     savingRow = entry.translation_key;
     error = '';
     success = '';
     try {
-      await boApi(base, {
-        method: 'PUT',
+      await boApi(base + '/keys', {
+        method: 'PATCH',
         body: JSON.stringify({
-          scope: expectedScope, language: expectedLanguage,
-          key: entry.translation_key, value: next
+          scope: requestedScope, language: requestedLanguage,
+          key: entry.translation_key, description: nextDescription, value: nextValue
         })
       });
-      if (scope === expectedScope && language === expectedLanguage && selectedModule === expectedModule) {
+      if (scope === requestedScope && language === requestedLanguage &&
+          selectedModule === requestedModule) {
         entries = entries.map((item) => item.translation_key === entry.translation_key
-          ? { ...item, value: next, missing_translation: next.trim() === '' } : item);
-        const pending = { ...drafts };
-        delete pending[entry.translation_key];
-        drafts = pending;
+          ? {
+              ...item, description: nextDescription, value: nextValue,
+              missing_translation: nextValue.trim() === ''
+            }
+          : item);
+        cancelEditAfterSave();
         await loadModules();
       }
       success = t.saved;
@@ -214,33 +232,29 @@
     }
   }
 
+  function cancelEditAfterSave(): void {
+    editingKey = '';
+    editValue = '';
+    editDescription = '';
+  }
+
   async function saveEditor(): Promise<void> {
     if (!language || !key.trim() || busy) return;
     busy = true;
     error = '';
     success = '';
-    const fullKey = ownedKey();
     try {
-      if (editingExisting) {
-        await boApi(base + '/keys', {
-          method: 'PATCH',
-          body: JSON.stringify({
-            scope, key: fullKey, language, description: description.trim() || null, value
-          })
-        });
-      } else {
-        await boApi(base + '/keys', {
-          method: 'POST',
-          body: JSON.stringify({
-            scope, key: fullKey, description: description.trim() || null,
-            language, value
-          })
-        });
-      }
+      await boApi(base + '/keys', {
+        method: 'POST',
+        body: JSON.stringify({
+          scope, key: ownedKey(), description: description.trim() || null,
+          language, value
+        })
+      });
       editorOpen = false;
       await loadEntries();
       await loadModules();
-      success = editingExisting ? t.saved : t.keyCreated;
+      success = t.keyCreated;
     } catch (cause) {
       error = explain(cause);
     } finally {
@@ -257,9 +271,7 @@
       const query = 'scope=' + encodeURIComponent(scope) + '&key=' + encodeURIComponent(entry.translation_key);
       await boApi(base + '/keys?' + query, { method: 'DELETE' });
       entries = entries.filter((row) => row.translation_key !== entry.translation_key);
-      const pending = { ...drafts };
-      delete pending[entry.translation_key];
-      drafts = pending;
+      if (editingKey === entry.translation_key) cancelEditAfterSave();
       await loadModules();
       success = t.keyDeleted;
     } catch (cause) {
@@ -390,25 +402,42 @@
   {#if error}<Alert kind="error">{error}</Alert>{/if}
   {#if success}<Alert kind="success">{success}</Alert>{/if}
 
-  <section class="panel language-block">
-    <h2>{t.language}</h2>
-    <p class="hint">{t.languageHint}</p>
-    <label>{t.language}
-      <select bind:value={language} onchange={(event) => chooseLanguage(event.currentTarget.value)} disabled={busy || !!savingRow}>
-        {#each languages as row (row.iso_code)}
-          <option value={row.iso_code}>{row.name} ({row.iso_code.toUpperCase()})</option>
-        {/each}
-      </select>
-    </label>
+  <section class="language-bar" aria-label={t.language}>
+    <div class="language-bar__rows">
+      <div class="language-bar__row">
+        <span class="language-bar__label">{t.interfaceLanguage}</span>
+        <span class="language-bar__value">
+          <span aria-hidden="true">{languageFlag(interfaceCode)}</span>
+          <strong>{interfaceCode.toUpperCase()}</strong>
+        </span>
+      </div>
+      <div class="language-bar__row">
+        <span class="language-bar__label">{t.editingIn}</span>
+        <span class="language-bar__value">
+          <span aria-hidden="true">{language ? languageFlag(language) : '🌐'}</span>
+          <strong>{language ? language.toUpperCase() : '—'}</strong>
+        </span>
+      </div>
+    </div>
+    <div class="language-bar__switcher">
+      <Dropdown value={language} options={languageOptions} label={t.language}
+        onChange={chooseLanguage} disabled={busy || !!savingRow || !!editingKey} />
+    </div>
   </section>
 
   <section class="panel transfer-block">
     <h2>{t.importExport}</h2>
     <div class="actions">
       <label>{t.scope}
-        <select bind:value={exportScope} disabled={busy}>
-          <option value="bo">BO</option><option value="app">App</option><option value="front">Front</option>
-        </select>
+        <div class="transfer-scope">
+          <Dropdown value={exportScope} options={[
+            { value: 'bo', label: 'BO' },
+            { value: 'app', label: 'App' },
+            { value: 'front', label: 'Front' }
+          ]} label={t.scope}
+            onChange={(code) => (exportScope = code as 'bo' | 'app' | 'front')}
+            disabled={busy} />
+        </div>
       </label>
       <Button type="button" variant="secondary" onclick={download} disabled={busy || !language}>{t.export}</Button>
       {#if canPublish}
@@ -465,32 +494,34 @@
     <section class="panel">
       <div class="module-heading">
         <div>
-          <Button type="button" variant="secondary" onclick={() => { selectedModule = ''; entries = []; drafts = {}; }}>{t.backModules}</Button>
+          <Button type="button" variant="secondary" onclick={() => { selectedModule = ''; entries = []; editingKey = ''; }} disabled={!!editingKey || !!savingRow || busy}>{t.backModules}</Button>
           <h2>{selectedModule === 'system' ? t.system : selectedModule}</h2>
           <p class="hint">{entries.length} {t.entries} · {missing} {t.missing}</p>
         </div>
         <div class="actions">
           {#if activeScopes.length > 1}
             <label>{t.scope}
-              <select bind:value={scope} onchange={(event) => {
-                scope = event.currentTarget.value as 'bo' | 'app' | 'front';
-                drafts = {};
-                void loadEntries();
-              }} disabled={busy || !!savingRow}>
-                {#each activeScopes as item (item)}
-                  <option value={item}>{item.toUpperCase()}</option>
-                {/each}
-              </select>
+              <div class="module-scope">
+                <Dropdown value={scope} options={activeScopes.map((item) => ({
+                  value: item, label: item.toUpperCase()
+                }))} label={t.scope}
+                  onChange={(code) => {
+                    scope = code as 'bo' | 'app' | 'front';
+                    editingKey = '';
+                    void loadEntries();
+                  }}
+                  disabled={busy || !!savingRow || !!editingKey} />
+              </div>
             </label>
           {:else if activeScopes.length === 1}
             <span>{activeScopes[0].toUpperCase()}</span>
           {/if}
-          <Button type="button" onclick={newKey} disabled={busy || !!savingRow}>{t.createKey}</Button>
+          <Button type="button" onclick={newKey} disabled={busy || !!savingRow || !!editingKey}>{t.createKey}</Button>
         </div>
       </div>
       <div class="entry-filters">
-        <label>{t.searchTranslations}<input type="search" bind:value={search} placeholder={t.searchTranslations} /></label>
-        <label class="checkbox-filter"><input type="checkbox" bind:checked={missingOnly} /> {t.missingOnly}</label>
+        <label>{t.searchTranslations}<input type="search" bind:value={search} placeholder={t.searchTranslations} disabled={!!editingKey} /></label>
+        <label class="checkbox-filter"><input type="checkbox" bind:checked={missingOnly} disabled={!!editingKey} /> {t.missingOnly}</label>
       </div>
       {#if entries.length === 0}
         <p class="hint">{t.empty}</p>
@@ -502,27 +533,41 @@
               {#each filteredEntries as entry (entry.translation_key)}
                 <tr>
                   <td class="key-cell"><code>{entry.translation_key}</code></td>
-                  <td class="explanation-cell">{entry.description || '—'}</td>
+                  <td class="explanation-cell">
+                    {#if editingKey === entry.translation_key}
+                      <input type="text" bind:value={editDescription} maxlength="4096"
+                        aria-label={t.description + ': ' + entry.translation_key}
+                        disabled={savingRow === entry.translation_key} />
+                    {:else}
+                      {entry.description || '—'}
+                    {/if}
+                  </td>
                   <td class="value-cell">
-                    <textarea rows="2" aria-label={t.value + ': ' + entry.translation_key}
-                      value={drafts[entry.translation_key] ?? entry.value}
-                      oninput={(event) => {
-                        drafts = { ...drafts, [entry.translation_key]: event.currentTarget.value };
-                      }}
-                      disabled={busy || (!!savingRow && savingRow !== entry.translation_key)}></textarea>
+                    {#if editingKey === entry.translation_key}
+                      <textarea rows="2" bind:value={editValue} maxlength="8192"
+                        aria-label={t.value + ': ' + entry.translation_key}
+                        disabled={savingRow === entry.translation_key}></textarea>
+                    {:else}
+                      <span class="translation-text">{entry.value || '—'}</span>
+                    {/if}
                     {#if entry.fallback_value && (entry.missing_translation || language !== 'fr')}
                       <small>{t.fallback}: {entry.fallback_value}</small>
                     {/if}
                   </td>
                   <td><span class:missing={entry.missing_translation} class="status">{entry.missing_translation ? t.missing : t.complete}</span></td>
                   <td class="row-actions">
-                    {#if drafts[entry.translation_key] !== undefined && drafts[entry.translation_key] !== entry.value}
+                    {#if editingKey === entry.translation_key}
                       <Button type="button" onclick={() => { void saveInline(entry); }}
-                        loading={savingRow === entry.translation_key} disabled={busy || (!!savingRow && savingRow !== entry.translation_key)}>{t.save}</Button>
+                        loading={savingRow === entry.translation_key} disabled={busy || !!savingRow}>{t.validate}</Button>
+                      <Button type="button" variant="secondary" onclick={cancelEdit}
+                        disabled={busy || !!savingRow}>{t.cancel}</Button>
+                    {:else}
+                      <Button type="button" variant="secondary" onclick={() => edit(entry)}
+                        disabled={busy || !!savingRow || !!editingKey}>{t.edit}</Button>
                     {/if}
-                    <Button type="button" variant="secondary" onclick={() => edit(entry)} disabled={busy || !!savingRow}>{t.edit}</Button>
                     {#if canDeleteKeys}
-                      <Button type="button" variant="danger" onclick={() => { void removeKey(entry); }} disabled={busy || !!savingRow}>{t.deleteKey}</Button>
+                      <Button type="button" variant="danger" onclick={() => { void removeKey(entry); }}
+                        disabled={busy || !!savingRow || !!editingKey}>{t.deleteKey}</Button>
                     {/if}
                   </td>
                 </tr>
@@ -534,18 +579,17 @@
     </section>
   {/if}
 
-  <Modal open={editorOpen} title={editingExisting ? t.edit : t.createKey} onClose={() => { editorOpen = false; }}>
+  <Modal open={editorOpen} title={t.createKey} onClose={() => { editorOpen = false; }}>
     <form class="modal-form" onsubmit={(event) => { event.preventDefault(); void saveEditor(); }}>
       <div class="modal-columns">
         <label>{t.scope}<input value={scope.toUpperCase()} readonly /></label>
-        <label>{t.key}<input bind:value={key} readonly={editingExisting} required maxlength="190" placeholder="create.success" /></label>
+        <label>{t.key}<input bind:value={key} required maxlength="190" placeholder="create.success" /></label>
       </div>
-      {#if editingExisting}<p class="hint">{t.keyLocked}</p>{/if}
       <label>{t.description}<textarea bind:value={description} rows="3" maxlength="4096"></textarea></label>
       <label>{t.value} ({language.toUpperCase()})<textarea bind:value={value} rows="4" maxlength="8192"></textarea></label>
       <div class="actions modal-actions">
         <Button type="button" variant="secondary" onclick={() => { editorOpen = false; }} disabled={busy}>{t.cancel}</Button>
-        <Button type="submit" loading={busy} disabled={busy || !key.trim()}>{editingExisting ? t.save : t.createKey}</Button>
+        <Button type="submit" loading={busy} disabled={busy || !key.trim()}>{t.createKey}</Button>
       </div>
     </form>
   </Modal>
@@ -553,6 +597,27 @@
 
 <style>
   .page { width: 100%; max-width: 1400px; margin: 0 auto; display: grid; gap: 20px; }
+  /* HP AdminLanguageBar / LanguageContextBanner: exact layout proportions,
+     using SymSvel Design System colors for both themes. */
+  .language-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    flex-wrap: wrap; padding: 14px 18px;
+    border: 1px solid var(--bo-border, #d4e0e6); border-radius: 18px;
+    background: var(--bo-surface, #fff); color: var(--bo-text, #182b36);
+    box-shadow: var(--bo-shadow, 0 10px 28px rgba(0, 0, 0, 0.14));
+  }
+  .language-bar__rows { flex: 1 1 420px; min-width: 280px; display: grid; gap: 10px; }
+  .language-bar__row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .language-bar__label {
+    min-width: 180px; font-size: 13px; font-weight: 800;
+    color: var(--bo-muted, #667085); text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .language-bar__value { display: inline-flex; align-items: center; gap: 8px; color: var(--bo-text, #182b36); }
+  .language-bar__value strong { font-size: 15px; }
+  .language-bar__switcher { width: 260px; min-width: min(100%, 260px); }
+  .transfer-scope { width: 145px; }
+  .module-scope { width: 140px; }
+
   .page-heading, .module-heading {
     display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
   }
@@ -574,7 +639,6 @@
   input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
     outline: 2px solid var(--bo-focus, #148fa4); outline-offset: 2px;
   }
-  .language-block label { max-width: 420px; }
   .actions { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
   .transfer-block .actions { margin-bottom: 10px; }
   .transfer-block .actions label { width: 140px; }
@@ -619,6 +683,10 @@
   .modal-columns { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
   .modal-actions { justify-content: flex-end; border-top: 1px solid var(--bo-border, #d4e0e6); padding-top: 16px; }
   @media (max-width: 780px) {
+    .language-bar { align-items: stretch; }
+    .language-bar__rows { min-width: 0; flex-basis: 100%; }
+    .language-bar__label { min-width: 0; width: 170px; }
+    .language-bar__switcher { width: 100%; }
     .panel { padding: 14px; }
     .module-heading { align-items: flex-start; }
     .modal-columns { grid-template-columns: 1fr; }
