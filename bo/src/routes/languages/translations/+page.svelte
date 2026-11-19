@@ -368,53 +368,46 @@
 <svelte:head><title>{t.title} | SymSvel BO</title></svelte:head>
 
 <div class="page">
-  <header>
-    <div><h1>{t.title}</h1><p>{t.intro}</p></div>
+  <header class="page-heading">
+    <div><h1>{t.title}</h1><p class="hint">{t.intro}</p></div>
     <Button type="button" variant="secondary" onclick={() => goto(resolve('/languages'))}>{languageCopy(locale).title}</Button>
   </header>
   {#if error}<Alert kind="error">{error}</Alert>{/if}
   {#if success}<Alert kind="success">{success}</Alert>{/if}
-  <section class="panel">
-    <div class="selectors">
-      <label>{t.language}
-        <select bind:value={language} onchange={(event) => chooseLanguage(event.currentTarget.value)}>
-          {#each languages as row (row.iso_code)}
-            <option value={row.iso_code}>{row.name} ({row.iso_code})</option>
-          {/each}
+
+  <section class="panel language-block">
+    <h2>{t.language}</h2>
+    <p class="hint">{t.languageHint}</p>
+    <label>{t.language}
+      <select bind:value={language} onchange={(event) => chooseLanguage(event.currentTarget.value)} disabled={busy || !!savingRow}>
+        {#each languages as row (row.iso_code)}
+          <option value={row.iso_code}>{row.name} ({row.iso_code.toUpperCase()})</option>
+        {/each}
+      </select>
+    </label>
+  </section>
+
+  <section class="panel transfer-block">
+    <h2>{t.importExport}</h2>
+    <div class="actions">
+      <label>{t.scope}
+        <select bind:value={exportScope} disabled={busy}>
+          <option value="bo">BO</option><option value="app">App</option><option value="front">Front</option>
         </select>
       </label>
-      {#if selectedModule}
-        <Button type="button" variant="secondary" onclick={() => { selectedModule = ''; entries = []; }}>{t.backModules}</Button>
-        {#if activeScopes.length > 1}
-          <label>{t.scope}
-            <select bind:value={scope} onchange={(event) => { scope = event.currentTarget.value as 'bo' | 'app' | 'front'; key = ''; value = ''; void loadEntries(); }}>
-              {#each activeScopes as item (item)}
-                <option value={item}>{item.toUpperCase()}</option>
-              {/each}
-            </select>
-          </label>
-        {:else if activeScopes.length === 1}
-          <span>{activeScopes[0].toUpperCase()}</span>
-        {/if}
-        <Button type="button" onclick={download} disabled={busy || !language}>{t.export}</Button>
-        {#if canPublish}
-          <Button type="button" variant="secondary" onclick={publishTs} disabled={busy || !language}>{t.tsPublish}</Button>
-        {/if}
+      <Button type="button" variant="secondary" onclick={download} disabled={busy || !language}>{t.export}</Button>
+      {#if canPublish}
+        <Button type="button" variant="secondary" onclick={publishTs} disabled={busy || !language}>{t.tsPublish}</Button>
       {/if}
-    </div>
-    {#if selectedModule}<p class="hint">{t.exportHint}</p>{/if}
-    <div class="actions">
       {#if csvCanExport}
         <Button type="button" variant="secondary" onclick={exportCsv} disabled={busy}>{t.csvExport}</Button>
       {/if}
     </div>
     {#if csvCanImport}
-      <div class="csv-import">
-        <h2>{t.csvImport}</h2>
+      <details class="csv-import">
+        <summary>{t.csvImport}</summary>
         <p class="hint">{t.csvImportHint}</p>
-        <label>{t.csvFile}
-          <input type="file" accept=".csv,text/csv" onchange={(event) => { void selectCsv(event); }} />
-        </label>
+        <label>{t.csvFile}<input type="file" accept=".csv,text/csv" onchange={(event) => { void selectCsv(event); }} /></label>
         {#if csvName}<p>{csvName}</p>{/if}
         <div class="actions">
           <Button type="button" variant="secondary" onclick={() => importCsv('preview')} disabled={busy || !csvContent}>{t.csvPreview}</Button>
@@ -428,69 +421,119 @@
             {t.csvTextsUpdated}: {csvPreview.texts_updated},
             {t.csvUnchanged}: {csvPreview.unchanged}</p>
         {/if}
-      </div>
+      </details>
     {/if}
   </section>
+
   {#if !selectedModule}
     <section class="panel">
       <h2>{t.chooseModule}</h2>
       {#if progress}
-        <p>{progress.translated} / {progress.total} {t.translatedCount}
+        <p class="hint">{progress.translated} / {progress.total} {t.translatedCount}
           {#if progress.percent !== null} ({progress.percent}%){/if}
         </p>
         <div class="module-grid">
           {#each progress.modules as item (item.module)}
             <button type="button" class="module-card" onclick={() => { void openModule(item); }}>
               <strong>{item.module === 'system' ? t.system : item.module}</strong>
-              <span>{item.translated} / {item.total} {t.translatedCount}, {item.missing} {t.missing}</span>
+              <span>{item.translated} / {item.total} {t.translatedCount} · {item.missing} {t.missing}</span>
               <progress value={item.translated} max={Math.max(1, item.total)}></progress>
-              <span>{item.percent === null ? t.noKeys : item.percent + '%'}</span>
+              <span class="percent">{item.percent === null ? t.noKeys : item.percent + '%'}</span>
             </button>
           {/each}
+        </div>
+      {:else}
+        <p class="hint">{busy ? t.loading : t.empty}</p>
+      {/if}
+    </section>
+  {:else}
+    <section class="panel">
+      <div class="module-heading">
+        <div>
+          <Button type="button" variant="secondary" onclick={() => { selectedModule = ''; entries = []; drafts = {}; }}>{t.backModules}</Button>
+          <h2>{selectedModule === 'system' ? t.system : selectedModule}</h2>
+          <p class="hint">{entries.length} {t.entries} · {missing} {t.missing}</p>
+        </div>
+        <div class="actions">
+          {#if activeScopes.length > 1}
+            <label>{t.scope}
+              <select bind:value={scope} onchange={(event) => {
+                scope = event.currentTarget.value as 'bo' | 'app' | 'front';
+                drafts = {};
+                void loadEntries();
+              }} disabled={busy || !!savingRow}>
+                {#each activeScopes as item (item)}
+                  <option value={item}>{item.toUpperCase()}</option>
+                {/each}
+              </select>
+            </label>
+          {:else if activeScopes.length === 1}
+            <span>{activeScopes[0].toUpperCase()}</span>
+          {/if}
+          <Button type="button" onclick={newKey} disabled={busy || !!savingRow}>{t.createKey}</Button>
+        </div>
+      </div>
+      <div class="entry-filters">
+        <label>{t.searchTranslations}<input type="search" bind:value={search} placeholder={t.searchTranslations} /></label>
+        <label class="checkbox-filter"><input type="checkbox" bind:checked={missingOnly} /> {t.missingOnly}</label>
+      </div>
+      {#if entries.length === 0}
+        <p class="hint">{t.empty}</p>
+      {:else}
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>{t.key}</th><th>{t.description}</th><th>{t.value}</th><th>{t.status}</th><th>{t.actions}</th></tr></thead>
+            <tbody>
+              {#each filteredEntries as entry (entry.translation_key)}
+                <tr>
+                  <td class="key-cell"><code>{entry.translation_key}</code></td>
+                  <td class="explanation-cell">{entry.description || '—'}</td>
+                  <td class="value-cell">
+                    <textarea rows="2" aria-label={t.value + ': ' + entry.translation_key}
+                      value={drafts[entry.translation_key] ?? entry.value}
+                      oninput={(event) => {
+                        drafts = { ...drafts, [entry.translation_key]: event.currentTarget.value };
+                      }}
+                      disabled={busy || (!!savingRow && savingRow !== entry.translation_key)}></textarea>
+                    {#if entry.missing_translation && entry.fallback_value}
+                      <small>{t.fallback}: {entry.fallback_value}</small>
+                    {/if}
+                  </td>
+                  <td><span class:missing={entry.missing_translation} class="status">{entry.missing_translation ? t.missing : t.complete}</span></td>
+                  <td class="row-actions">
+                    {#if drafts[entry.translation_key] !== undefined && drafts[entry.translation_key] !== entry.value}
+                      <Button type="button" onclick={() => { void saveInline(entry); }}
+                        loading={savingRow === entry.translation_key} disabled={busy || (!!savingRow && savingRow !== entry.translation_key)}>{t.save}</Button>
+                    {/if}
+                    <Button type="button" variant="secondary" onclick={() => edit(entry)} disabled={busy || !!savingRow}>{t.edit}</Button>
+                    {#if canDeleteKeys}
+                      <Button type="button" variant="danger" onclick={() => { void removeKey(entry); }} disabled={busy || !!savingRow}>{t.deleteKey}</Button>
+                    {/if}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
         </div>
       {/if}
     </section>
   {/if}
-  {#if selectedModule}
-  <section class="panel">
-    <h2>{t.editor}</h2>
-    <form onsubmit={(event) => { event.preventDefault(); void save(); }}>
-      <label>{t.key}<input bind:value={key} required maxlength="190" placeholder="auth.signIn" /></label>
-      <label>{t.description}<input bind:value={description} maxlength="4096" /></label>
-      <label>{t.value}<textarea bind:value={value} maxlength="8192" rows="3"></textarea></label>
-      <div class="actions">
-        <Button type="submit" disabled={busy || !language || !key.trim()}>{t.save}</Button>
-        <Button type="button" variant="secondary" onclick={createKey} disabled={busy || !language || !key.trim()}>{t.createKey}</Button>
-        <Button type="button" variant="secondary" onclick={() => { key = ''; value = ''; description = ''; }}>{t.clear}</Button>
-        <Button type="button" variant="secondary" onclick={remove} disabled={busy || !language || !key}>{t.delete}</Button>
+
+  <Modal open={editorOpen} title={editingExisting ? t.edit : t.createKey} onClose={() => { editorOpen = false; }}>
+    <form class="modal-form" onsubmit={(event) => { event.preventDefault(); void saveEditor(); }}>
+      <div class="modal-columns">
+        <label>{t.scope}<input value={scope.toUpperCase()} readonly /></label>
+        <label>{t.key}<input bind:value={key} readonly={editingExisting} required maxlength="190" placeholder="create.success" /></label>
+      </div>
+      {#if editingExisting}<p class="hint">{t.keyLocked}</p>{/if}
+      <label>{t.description}<textarea bind:value={description} rows="3" maxlength="4096"></textarea></label>
+      <label>{t.value} ({language.toUpperCase()})<textarea bind:value={value} rows="4" maxlength="8192"></textarea></label>
+      <div class="actions modal-actions">
+        <Button type="button" variant="secondary" onclick={() => { editorOpen = false; }} disabled={busy}>{t.cancel}</Button>
+        <Button type="submit" loading={busy} disabled={busy || !key.trim()}>{editingExisting ? t.save : t.createKey}</Button>
       </div>
     </form>
-  </section>
-  <section class="panel">
-    <h2>{t.entries} ({entries.length}, {missing} {t.missing})</h2>
-    <div class="entry-filters">
-      <label>{t.searchTranslations}<input bind:value={search} placeholder={t.searchTranslations} /></label>
-      <label><input type="checkbox" bind:checked={missingOnly} /> {t.missingOnly}</label>
-    </div>
-    {#if entries.length === 0}
-      <p>{t.empty}</p>
-    {:else}
-      <div class="table-wrap"><table>
-        <thead><tr><th>{t.key}</th><th>{t.value}</th><th>{t.status}</th><th></th></tr></thead>
-        <tbody>
-          {#each filteredEntries as entry (entry.translation_key)}
-            <tr>
-              <td><code>{entry.translation_key}</code></td>
-              <td>{entry.value || entry.fallback_value || '—'}{#if entry.missing_translation && entry.fallback_value} <span class="fallback">({t.fallback})</span>{/if}</td>
-              <td>{entry.missing_translation ? t.missing : t.complete}</td>
-              <td><Button type="button" variant="secondary" onclick={() => edit(entry)}>{t.edit}</Button></td>
-            </tr>
-          {/each}
-        </tbody>
-      </table></div>
-    {/if}
-  </section>
-  {/if}
+  </Modal>
 </div>
 
 <style>

@@ -82,3 +82,7 @@ L'écran maintient la langue, le module et le scope comme états Svelte distinct
 ### Libellés UX HP (19/11/2026)
 
 Le module Languages déclare et traduit dans ses propres dictionnaires les textes du nouveau parcours : choix de langue toujours visible, Import / Export, chargement, actions, identifiant verrouillé dans la modale et suppression globale des clés. Les messages français et anglais restent alignés et les textes dynamiques passent par `translationCopy`, sans chaîne métier codée en dur dans Svelte.
+
+### Hiérarchie des panneaux (19/11/2026)
+
+Le rendu présente désormais une sélection de langue persistante, un panneau Import/Export, les modules et leur taux de traduction, puis le tableau éditable du module. Le formulaire de création ou modification se trouve dans la modale native BO. Les valeurs existantes sont modifiées directement dans les cellules ; seules les valeurs changées affichent Enregistrer. Les actions sauvegardent par API sans rechargement ni retour forcé à la liste.
