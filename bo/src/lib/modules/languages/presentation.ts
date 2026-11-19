@@ -58,6 +58,15 @@ export function filterLanguages(
 
 const translationLabels = {
   fr: {
+    languageHint: "Choisissez la langue à traduire, même si une seule langue est active.",
+    importExport: "Import / Export",
+    loading: "Chargement des traductions…",
+    actions: "Actions",
+    deleteKey: "Supprimer la clé",
+    keyDeleted: "Clé et traductions supprimées.",
+    confirmDeleteKey: "Supprimer cette clé et ses traductions dans toutes les langues ? Les clés des modules seront recréées lors de leur prochaine synchronisation.",
+    keyLocked: "L'identifiant de la clé ne peut pas être modifié.",
+    cancel: "Annuler",
     title: 'Traductions', intro: 'Éditez les textes par interface et par langue.',
     scope: 'Interface', language: 'Langue', editor: 'Éditeur', key: 'Clé',
     value: 'Traduction', description: 'Description de la clé', status: 'État', missing: 'manquantes', complete: 'Traduite', fallback: 'texte de secours', createKey: 'Créer la clé', keyCreated: 'Clé créée.', export: 'Générer le fichier .ts', exportHint: 'Télécharge le dictionnaire TypeScript. La publication et la compilation restent à effectuer via Tooling.',
@@ -79,6 +88,15 @@ const translationLabels = {
     failure: 'Impossible de traiter les traductions.'
   },
   en: {
+    languageHint: "Choose the language to translate, even if only one language is active.",
+    importExport: "Import / Export",
+    loading: "Loading translations…",
+    actions: "Actions",
+    deleteKey: "Delete key",
+    keyDeleted: "Key and translations deleted.",
+    confirmDeleteKey: "Delete this key and translations in all languages? Module-supplied keys will be recreated on the next synchronization.",
+    keyLocked: "The key identifier cannot be changed.",
+    cancel: "Cancel",
     title: 'Translations', intro: 'Edit text by interface and language.',
     scope: 'Interface', language: 'Language', editor: 'Editor', key: 'Key',
     value: 'Translation', description: 'Key description', status: 'Status', missing: 'missing', complete: 'Translated', fallback: 'fallback text', createKey: 'Create key', keyCreated: 'Key created.', export: 'Generate .ts file', exportHint: 'Downloads the TypeScript dictionary. Publishing and building remain tooling operations.',

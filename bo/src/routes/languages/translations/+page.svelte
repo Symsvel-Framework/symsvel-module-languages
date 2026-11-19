@@ -4,6 +4,7 @@
   import { resolve } from '$app/paths';
   import Button from '../../../../../components/Button.svelte';
   import Alert from '../../../../../components/Alert.svelte';
+  import Modal from '../../../../../components/Modal.svelte';
   import { ApiError } from '../../../../../api/client';
   import { boApi } from '../../../../../api/session';
   import { uiLanguage } from '../../../../../api/locales';
@@ -29,6 +30,7 @@
 
   let languages = $state<BoLanguage[]>([]);
   let scope = $state<'bo' | 'app' | 'front'>('bo');
+  let exportScope = $state<'bo' | 'app' | 'front'>('bo');
   let language = $state('');
   let entries = $state<Translation[]>([]);
   let progress = $state<ModuleProgress | null>(null);
@@ -44,6 +46,13 @@
   let key = $state('');
   let value = $state('');
   let description = $state('');
+  let editorOpen = $state(false);
+  let editingExisting = $state(false);
+  let drafts = $state<Record<string, string>>({});
+  let savingRow = $state('');
+  let canDeleteKeys = $state(false);
+  let moduleLoadId = 0;
+  let entryLoadId = 0;
   let csvCanExport = $state(false);
   let csvCanImport = $state(false);
   let canPublish = $state(false);
@@ -80,11 +89,17 @@
   }
 
   async function loadModules(): Promise<void> {
-    if (!language) { progress = null; return; }
+    const id = ++moduleLoadId;
+    const requestedLanguage = language;
+    if (!requestedLanguage) { progress = null; return; }
     try {
-      const result = await boApi<{ data: ModuleProgress }>(`${base}/modules?language=${encodeURIComponent(language)}`);
-      progress = result.data;
-    } catch (cause) { error = explain(cause); }
+      const result = await boApi<{ data: ModuleProgress }>(
+        base + '/modules?language=' + encodeURIComponent(requestedLanguage)
+      );
+      if (id === moduleLoadId && requestedLanguage === language) progress = result.data;
+    } catch (cause) {
+      if (id === moduleLoadId) error = explain(cause);
+    }
   }
 
   async function openModule(module: ModuleSummary): Promise<void> {
@@ -95,6 +110,7 @@
     key = '';
     value = '';
     description = '';
+    drafts = {};
     await loadEntries();
   }
 
@@ -102,6 +118,7 @@
     language = code;
     selectedModule = '';
     entries = [];
+    drafts = {};
     void loadModules();
   }
 
@@ -113,10 +130,11 @@
       languages = result.data;
       language = result.data.find((row) => row.primary)?.iso_code ?? result.data[0]?.iso_code ?? '';
       if (language) await loadModules();
-      const caps = await boApi<{ data: { can_export: boolean; can_import: boolean; can_publish: boolean } }>(`${base}/csv-capabilities`);
+      const caps = await boApi<{ data: { can_export: boolean; can_import: boolean; can_publish: boolean; can_delete_keys?: boolean } }>(`${base}/csv-capabilities`);
       csvCanExport = caps.data.can_export;
       csvCanImport = caps.data.can_import;
       canPublish = caps.data.can_publish;
+      canDeleteKeys = caps.data.can_delete_keys === true;
     } catch (cause) {
       error = explain(cause);
     } finally {
@@ -125,78 +143,125 @@
   }
 
   async function loadEntries(): Promise<void> {
-    if (!language || !selectedModule) { entries = []; return; }
+    const id = ++entryLoadId;
+    const requestedLanguage = language;
+    const requestedScope = scope;
+    const requestedModule = selectedModule;
+    if (!requestedLanguage || !requestedModule) { entries = []; return; }
     busy = true;
     error = '';
     try {
-      const result = await boApi<{ data: Translation[] }>(`${base}?${params()}`);
-      entries = result.data;
+      const result = await boApi<{ data: Translation[] }>(base + '?' + params());
+      if (id === entryLoadId && requestedLanguage === language &&
+          requestedScope === scope && requestedModule === selectedModule) {
+        entries = result.data;
+      }
     } catch (cause) {
-      error = explain(cause);
+      if (id === entryLoadId) error = explain(cause);
     } finally {
-      busy = false;
+      if (id === entryLoadId) busy = false;
     }
+  }
+
+  function newKey(): void {
+    editingExisting = false;
+    key = '';
+    value = '';
+    description = '';
+    error = '';
+    editorOpen = true;
   }
 
   function edit(entry: Translation): void {
+    editingExisting = true;
     key = entry.translation_key;
     value = entry.value;
     description = entry.description ?? '';
-    success = '';
+    error = '';
+    editorOpen = true;
   }
 
-  async function createKey(): Promise<void> {
-    if (!key.trim() || busy || !language) return;
-    busy = true;
+  async function saveInline(entry: Translation): Promise<void> {
+    const next = drafts[entry.translation_key];
+    if (next === undefined || next === entry.value || savingRow || busy) return;
+    const expectedLanguage = language;
+    const expectedScope = scope;
+    const expectedModule = selectedModule;
+    savingRow = entry.translation_key;
     error = '';
     success = '';
     try {
-      await boApi(`${base}/keys`, {
-        method: 'POST',
-        body: JSON.stringify({ scope, key: ownedKey(), description: description.trim() || null })
+      await boApi(base, {
+        method: 'PUT',
+        body: JSON.stringify({
+          scope: expectedScope, language: expectedLanguage,
+          key: entry.translation_key, value: next
+        })
       });
-      await loadEntries();
-      await loadModules();
-      success = t.keyCreated;
-    } catch (cause) {
-      error = explain(cause);
-    } finally {
-      busy = false;
-    }
-  }
-
-  async function save(): Promise<void> {
-    if (!language || !key.trim() || busy) return;
-    busy = true;
-    error = '';
-    success = '';
-    try {
-      await boApi<{ data: Translation }>(base, {
-        method: 'PUT', body: JSON.stringify({ scope, language, key: ownedKey(), value })
-      });
-      await loadEntries();
-      await loadModules();
+      if (scope === expectedScope && language === expectedLanguage && selectedModule === expectedModule) {
+        entries = entries.map((item) => item.translation_key === entry.translation_key
+          ? { ...item, value: next, missing_translation: next.trim() === '' } : item);
+        const pending = { ...drafts };
+        delete pending[entry.translation_key];
+        drafts = pending;
+        await loadModules();
+      }
       success = t.saved;
     } catch (cause) {
       error = explain(cause);
     } finally {
+      savingRow = '';
+    }
+  }
+
+  async function saveEditor(): Promise<void> {
+    if (!language || !key.trim() || busy) return;
+    busy = true;
+    error = '';
+    success = '';
+    const fullKey = ownedKey();
+    try {
+      if (editingExisting) {
+        await boApi(base + '/keys', {
+          method: 'PATCH',
+          body: JSON.stringify({
+            scope, key: fullKey, language, description: description.trim() || null, value
+          })
+        });
+      } else {
+        await boApi(base + '/keys', {
+          method: 'POST',
+          body: JSON.stringify({
+            scope, key: fullKey, description: description.trim() || null,
+            language, value
+          })
+        });
+      }
+      editorOpen = false;
+      await loadEntries();
+      await loadModules();
+      success = editingExisting ? t.saved : t.keyCreated;
+    } catch (cause) {
+      error = explain(cause);
+    } finally {
       busy = false;
     }
   }
 
-  async function remove(): Promise<void> {
-    if (!language || !key || busy || !confirm(t.confirmDelete)) return;
+  async function removeKey(entry: Translation): Promise<void> {
+    if (!canDeleteKeys || busy || savingRow || !confirm(t.confirmDeleteKey)) return;
     busy = true;
     error = '';
     success = '';
     try {
-      await boApi(`${base}?${params(true)}`, { method: 'DELETE' });
-      key = '';
-      value = '';
-      description = '';
-      await loadEntries();
+      const query = 'scope=' + encodeURIComponent(scope) + '&key=' + encodeURIComponent(entry.translation_key);
+      await boApi(base + '/keys?' + query, { method: 'DELETE' });
+      entries = entries.filter((row) => row.translation_key !== entry.translation_key);
+      const pending = { ...drafts };
+      delete pending[entry.translation_key];
+      drafts = pending;
       await loadModules();
-      success = t.deleted;
+      success = t.keyDeleted;
     } catch (cause) {
       error = explain(cause);
     } finally {
@@ -210,7 +275,7 @@
     error = '';
     success = '';
     try {
-      const result = await boApi<{ data: TsExport }>(`${base}/export?${params()}`);
+      const result = await boApi<{ data: TsExport }>(`${base}/export?scope=${encodeURIComponent(exportScope)}&language=${encodeURIComponent(language)}`);
       saveBlob(result.data.content, result.data.filename, 'text/typescript;charset=utf-8');
       success = t.generated;
     } catch (cause) {
@@ -240,7 +305,7 @@
     try {
       const result = await boApi<{ data: { file: string; changed: boolean; entries: number } }>(
         `${base}/publish`,
-        { method: 'POST', body: JSON.stringify({ scope, language }) }
+        { method: 'POST', body: JSON.stringify({ scope: exportScope, language }) }
       );
       success = result.data.changed ? `${t.tsPublished}: ${result.data.file}` : t.tsUnchanged;
     } catch (cause) {
@@ -318,53 +383,46 @@
 <svelte:head><title>{t.title} | SymSvel BO</title></svelte:head>
 
 <div class="page">
-  <header>
-    <div><h1>{t.title}</h1><p>{t.intro}</p></div>
+  <header class="page-heading">
+    <div><h1>{t.title}</h1><p class="hint">{t.intro}</p></div>
     <Button type="button" variant="secondary" onclick={() => goto(resolve('/languages'))}>{languageCopy(locale).title}</Button>
   </header>
   {#if error}<Alert kind="error">{error}</Alert>{/if}
   {#if success}<Alert kind="success">{success}</Alert>{/if}
-  <section class="panel">
-    <div class="selectors">
-      <label>{t.language}
-        <select bind:value={language} onchange={(event) => chooseLanguage(event.currentTarget.value)}>
-          {#each languages as row (row.iso_code)}
-            <option value={row.iso_code}>{row.name} ({row.iso_code})</option>
-          {/each}
+
+  <section class="panel language-block">
+    <h2>{t.language}</h2>
+    <p class="hint">{t.languageHint}</p>
+    <label>{t.language}
+      <select bind:value={language} onchange={(event) => chooseLanguage(event.currentTarget.value)} disabled={busy || !!savingRow}>
+        {#each languages as row (row.iso_code)}
+          <option value={row.iso_code}>{row.name} ({row.iso_code.toUpperCase()})</option>
+        {/each}
+      </select>
+    </label>
+  </section>
+
+  <section class="panel transfer-block">
+    <h2>{t.importExport}</h2>
+    <div class="actions">
+      <label>{t.scope}
+        <select bind:value={exportScope} disabled={busy}>
+          <option value="bo">BO</option><option value="app">App</option><option value="front">Front</option>
         </select>
       </label>
-      {#if selectedModule}
-        <Button type="button" variant="secondary" onclick={() => { selectedModule = ''; entries = []; }}>{t.backModules}</Button>
-        {#if activeScopes.length > 1}
-          <label>{t.scope}
-            <select bind:value={scope} onchange={(event) => { scope = event.currentTarget.value as 'bo' | 'app' | 'front'; key = ''; value = ''; void loadEntries(); }}>
-              {#each activeScopes as item (item)}
-                <option value={item}>{item.toUpperCase()}</option>
-              {/each}
-            </select>
-          </label>
-        {:else if activeScopes.length === 1}
-          <span>{activeScopes[0].toUpperCase()}</span>
-        {/if}
-        <Button type="button" onclick={download} disabled={busy || !language}>{t.export}</Button>
-        {#if canPublish}
-          <Button type="button" variant="secondary" onclick={publishTs} disabled={busy || !language}>{t.tsPublish}</Button>
-        {/if}
+      <Button type="button" variant="secondary" onclick={download} disabled={busy || !language}>{t.export}</Button>
+      {#if canPublish}
+        <Button type="button" variant="secondary" onclick={publishTs} disabled={busy || !language}>{t.tsPublish}</Button>
       {/if}
-    </div>
-    {#if selectedModule}<p class="hint">{t.exportHint}</p>{/if}
-    <div class="actions">
       {#if csvCanExport}
         <Button type="button" variant="secondary" onclick={exportCsv} disabled={busy}>{t.csvExport}</Button>
       {/if}
     </div>
     {#if csvCanImport}
-      <div class="csv-import">
-        <h2>{t.csvImport}</h2>
+      <details class="csv-import">
+        <summary>{t.csvImport}</summary>
         <p class="hint">{t.csvImportHint}</p>
-        <label>{t.csvFile}
-          <input type="file" accept=".csv,text/csv" onchange={(event) => { void selectCsv(event); }} />
-        </label>
+        <label>{t.csvFile}<input type="file" accept=".csv,text/csv" onchange={(event) => { void selectCsv(event); }} /></label>
         {#if csvName}<p>{csvName}</p>{/if}
         <div class="actions">
           <Button type="button" variant="secondary" onclick={() => importCsv('preview')} disabled={busy || !csvContent}>{t.csvPreview}</Button>
@@ -378,93 +436,192 @@
             {t.csvTextsUpdated}: {csvPreview.texts_updated},
             {t.csvUnchanged}: {csvPreview.unchanged}</p>
         {/if}
-      </div>
+      </details>
     {/if}
   </section>
+
   {#if !selectedModule}
     <section class="panel">
       <h2>{t.chooseModule}</h2>
       {#if progress}
-        <p>{progress.translated} / {progress.total} {t.translatedCount}
+        <p class="hint">{progress.translated} / {progress.total} {t.translatedCount}
           {#if progress.percent !== null} ({progress.percent}%){/if}
         </p>
         <div class="module-grid">
           {#each progress.modules as item (item.module)}
             <button type="button" class="module-card" onclick={() => { void openModule(item); }}>
               <strong>{item.module === 'system' ? t.system : item.module}</strong>
-              <span>{item.translated} / {item.total} {t.translatedCount}, {item.missing} {t.missing}</span>
+              <span>{item.translated} / {item.total} {t.translatedCount} · {item.missing} {t.missing}</span>
               <progress value={item.translated} max={Math.max(1, item.total)}></progress>
-              <span>{item.percent === null ? t.noKeys : item.percent + '%'}</span>
+              <span class="percent">{item.percent === null ? t.noKeys : item.percent + '%'}</span>
             </button>
           {/each}
+        </div>
+      {:else}
+        <p class="hint">{busy ? t.loading : t.empty}</p>
+      {/if}
+    </section>
+  {:else}
+    <section class="panel">
+      <div class="module-heading">
+        <div>
+          <Button type="button" variant="secondary" onclick={() => { selectedModule = ''; entries = []; drafts = {}; }}>{t.backModules}</Button>
+          <h2>{selectedModule === 'system' ? t.system : selectedModule}</h2>
+          <p class="hint">{entries.length} {t.entries} · {missing} {t.missing}</p>
+        </div>
+        <div class="actions">
+          {#if activeScopes.length > 1}
+            <label>{t.scope}
+              <select bind:value={scope} onchange={(event) => {
+                scope = event.currentTarget.value as 'bo' | 'app' | 'front';
+                drafts = {};
+                void loadEntries();
+              }} disabled={busy || !!savingRow}>
+                {#each activeScopes as item (item)}
+                  <option value={item}>{item.toUpperCase()}</option>
+                {/each}
+              </select>
+            </label>
+          {:else if activeScopes.length === 1}
+            <span>{activeScopes[0].toUpperCase()}</span>
+          {/if}
+          <Button type="button" onclick={newKey} disabled={busy || !!savingRow}>{t.createKey}</Button>
+        </div>
+      </div>
+      <div class="entry-filters">
+        <label>{t.searchTranslations}<input type="search" bind:value={search} placeholder={t.searchTranslations} /></label>
+        <label class="checkbox-filter"><input type="checkbox" bind:checked={missingOnly} /> {t.missingOnly}</label>
+      </div>
+      {#if entries.length === 0}
+        <p class="hint">{t.empty}</p>
+      {:else}
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>{t.key}</th><th>{t.description}</th><th>{t.value}</th><th>{t.status}</th><th>{t.actions}</th></tr></thead>
+            <tbody>
+              {#each filteredEntries as entry (entry.translation_key)}
+                <tr>
+                  <td class="key-cell"><code>{entry.translation_key}</code></td>
+                  <td class="explanation-cell">{entry.description || '—'}</td>
+                  <td class="value-cell">
+                    <textarea rows="2" aria-label={t.value + ': ' + entry.translation_key}
+                      value={drafts[entry.translation_key] ?? entry.value}
+                      oninput={(event) => {
+                        drafts = { ...drafts, [entry.translation_key]: event.currentTarget.value };
+                      }}
+                      disabled={busy || (!!savingRow && savingRow !== entry.translation_key)}></textarea>
+                    {#if entry.fallback_value && (entry.missing_translation || language !== 'fr')}
+                      <small>{t.fallback}: {entry.fallback_value}</small>
+                    {/if}
+                  </td>
+                  <td><span class:missing={entry.missing_translation} class="status">{entry.missing_translation ? t.missing : t.complete}</span></td>
+                  <td class="row-actions">
+                    {#if drafts[entry.translation_key] !== undefined && drafts[entry.translation_key] !== entry.value}
+                      <Button type="button" onclick={() => { void saveInline(entry); }}
+                        loading={savingRow === entry.translation_key} disabled={busy || (!!savingRow && savingRow !== entry.translation_key)}>{t.save}</Button>
+                    {/if}
+                    <Button type="button" variant="secondary" onclick={() => edit(entry)} disabled={busy || !!savingRow}>{t.edit}</Button>
+                    {#if canDeleteKeys}
+                      <Button type="button" variant="danger" onclick={() => { void removeKey(entry); }} disabled={busy || !!savingRow}>{t.deleteKey}</Button>
+                    {/if}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
         </div>
       {/if}
     </section>
   {/if}
-  {#if selectedModule}
-  <section class="panel">
-    <h2>{t.editor}</h2>
-    <form onsubmit={(event) => { event.preventDefault(); void save(); }}>
-      <label>{t.key}<input bind:value={key} required maxlength="190" placeholder="auth.signIn" /></label>
-      <label>{t.description}<input bind:value={description} maxlength="4096" /></label>
-      <label>{t.value}<textarea bind:value={value} maxlength="8192" rows="3"></textarea></label>
-      <div class="actions">
-        <Button type="submit" disabled={busy || !language || !key.trim()}>{t.save}</Button>
-        <Button type="button" variant="secondary" onclick={createKey} disabled={busy || !language || !key.trim()}>{t.createKey}</Button>
-        <Button type="button" variant="secondary" onclick={() => { key = ''; value = ''; description = ''; }}>{t.clear}</Button>
-        <Button type="button" variant="secondary" onclick={remove} disabled={busy || !language || !key}>{t.delete}</Button>
+
+  <Modal open={editorOpen} title={editingExisting ? t.edit : t.createKey} onClose={() => { editorOpen = false; }}>
+    <form class="modal-form" onsubmit={(event) => { event.preventDefault(); void saveEditor(); }}>
+      <div class="modal-columns">
+        <label>{t.scope}<input value={scope.toUpperCase()} readonly /></label>
+        <label>{t.key}<input bind:value={key} readonly={editingExisting} required maxlength="190" placeholder="create.success" /></label>
+      </div>
+      {#if editingExisting}<p class="hint">{t.keyLocked}</p>{/if}
+      <label>{t.description}<textarea bind:value={description} rows="3" maxlength="4096"></textarea></label>
+      <label>{t.value} ({language.toUpperCase()})<textarea bind:value={value} rows="4" maxlength="8192"></textarea></label>
+      <div class="actions modal-actions">
+        <Button type="button" variant="secondary" onclick={() => { editorOpen = false; }} disabled={busy}>{t.cancel}</Button>
+        <Button type="submit" loading={busy} disabled={busy || !key.trim()}>{editingExisting ? t.save : t.createKey}</Button>
       </div>
     </form>
-  </section>
-  <section class="panel">
-    <h2>{t.entries} ({entries.length}, {missing} {t.missing})</h2>
-    <div class="entry-filters">
-      <label>{t.searchTranslations}<input bind:value={search} placeholder={t.searchTranslations} /></label>
-      <label><input type="checkbox" bind:checked={missingOnly} /> {t.missingOnly}</label>
-    </div>
-    {#if entries.length === 0}
-      <p>{t.empty}</p>
-    {:else}
-      <div class="table-wrap"><table>
-        <thead><tr><th>{t.key}</th><th>{t.value}</th><th>{t.status}</th><th></th></tr></thead>
-        <tbody>
-          {#each filteredEntries as entry (entry.translation_key)}
-            <tr>
-              <td><code>{entry.translation_key}</code></td>
-              <td>{entry.value || entry.fallback_value || '—'}{#if entry.missing_translation && entry.fallback_value} <span class="fallback">({t.fallback})</span>{/if}</td>
-              <td>{entry.missing_translation ? t.missing : t.complete}</td>
-              <td><Button type="button" variant="secondary" onclick={() => edit(entry)}>{t.edit}</Button></td>
-            </tr>
-          {/each}
-        </tbody>
-      </table></div>
-    {/if}
-  </section>
-  {/if}
+  </Modal>
 </div>
 
 <style>
-  .page { max-width: 1200px; margin: auto; display: grid; gap: 20px; }
-  header { display: flex; justify-content: space-between; gap: 16px; align-items: center; flex-wrap: wrap; }
-  h1, h2 { margin: 0 0 10px; }
-  header p, .hint { color: #667085; }
-  .panel { padding: 24px; border: 1px solid #e2e7ee; border-radius: 14px; background: white; }
-  .selectors { display: flex; align-items: end; gap: 14px; flex-wrap: wrap; }
-  label { display: grid; gap: 6px; font-weight: 600; }
-  input, select, textarea { padding: 9px; border: 1px solid #cbd5e1; border-radius: 7px; font: inherit; }
-  form { display: grid; gap: 14px; }
-  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .page { width: 100%; max-width: 1400px; margin: 0 auto; display: grid; gap: 20px; }
+  .page-heading, .module-heading {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
+  }
+  .page-heading h1 { margin: 0 0 6px; font-size: clamp(1.5rem, 3vw, 2rem); }
+  h2 { margin: 0 0 12px; font-size: 1.2rem; }
+  .module-heading h2 { margin: 12px 0 4px; }
+  .hint { color: var(--bo-muted, #667085); margin: 6px 0 12px; }
+  .panel {
+    min-width: 0; padding: 22px; border: 1px solid var(--bo-border, #d4e0e6);
+    border-radius: 14px; background: var(--bo-surface, #fff); color: var(--bo-text, #182b36);
+  }
+  label { display: grid; gap: 6px; font-size: 0.9rem; font-weight: 650; }
+  select, input, textarea {
+    width: 100%; min-width: 0; padding: 10px 12px;
+    border: 1px solid var(--bo-border, #d4e0e6); border-radius: 8px;
+    background: var(--bo-input, #fff); color: var(--bo-text, #182b36); font: inherit;
+  }
+  input[readonly] { opacity: 0.8; cursor: not-allowed; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+    outline: 2px solid var(--bo-focus, #148fa4); outline-offset: 2px;
+  }
+  .language-block label { max-width: 420px; }
+  .actions { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+  .transfer-block .actions { margin-bottom: 10px; }
+  .transfer-block .actions label { width: 140px; }
+  .csv-import { border-top: 1px solid var(--bo-border, #d4e0e6); margin-top: 16px; padding-top: 14px; }
+  .csv-import summary { cursor: pointer; color: var(--bo-primary, #087d92); font-weight: 700; }
+  .csv-import label { margin: 12px 0; max-width: 450px; }
+  .csv-import .actions label { width: auto; }
+  .module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .module-card {
+    display: grid; gap: 10px; text-align: left; padding: 16px; cursor: pointer;
+    border: 1px solid var(--bo-border, #d4e0e6); border-radius: 12px;
+    background: var(--bo-surface-muted, #f8fafb); color: var(--bo-text, #182b36);
+  }
+  .module-card:hover, .module-card:focus-visible { border-color: var(--bo-primary, #087d92); }
+  .module-card span { color: var(--bo-muted, #667085); font-size: 0.85rem; }
+  .module-card strong { font-size: 1rem; }
+  .module-card .percent { font-weight: 750; color: var(--bo-primary, #087d92); }
+  .module-card progress { width: 100%; height: 8px; accent-color: var(--bo-primary, #087d92); }
+  .entry-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 16px; margin: 20px 0; }
+  .entry-filters label:first-child { width: min(100%, 400px); }
+  .checkbox-filter { display: flex; align-items: center; gap: 8px; }
+  .checkbox-filter input { width: auto; }
   .table-wrap { overflow-x: auto; }
-  .csv-import { border-top: 1px solid #e2e7ee; margin-top: 20px; padding-top: 18px; display: grid; gap: 12px; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; border-bottom: 1px solid #e2e7ee; padding: 10px; }
-  td { overflow-wrap: anywhere; }
-  .fallback { color: #667085; font-size: 0.85em; }
-  .module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
-  .module-card { display: grid; gap: 8px; text-align: left; padding: 16px; border: 1px solid #cbd5e1; border-radius: 10px; background: white; cursor: pointer; }
-  .module-card:hover, .module-card:focus-visible { border-color: #2563eb; }
-  .module-card progress { width: 100%; }
-  .entry-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin-bottom: 16px; }
-  .entry-filters label { display: flex; align-items: center; gap: 8px; }
-  @media (max-width: 650px) { .selectors { display: grid; } }
+  table { border-collapse: collapse; width: 100%; }
+  th { background: var(--bo-surface-muted, #f8fafb); color: var(--bo-muted, #667085); font-size: 0.85rem; }
+  th, td { padding: 12px 10px; border-bottom: 1px solid var(--bo-border, #d4e0e6); text-align: left; vertical-align: middle; }
+  .key-cell { width: 23%; max-width: 260px; overflow-wrap: anywhere; }
+  .key-cell code { font-size: 0.8rem; }
+  .explanation-cell { width: 22%; color: var(--bo-muted, #667085); overflow-wrap: anywhere; }
+  .value-cell { width: 36%; min-width: 240px; }
+  .value-cell textarea { resize: vertical; }
+  .value-cell small { display: block; color: var(--bo-muted, #667085); margin-top: 5px; }
+  .status {
+    display: inline-block; padding: 3px 9px; border-radius: 99px;
+    background: var(--bo-success-bg, #e5f5ed); color: var(--bo-success-text, #146647);
+    font-weight: 700; font-size: 0.75rem;
+  }
+  .status.missing { background: var(--bo-error-bg, #fcecef); color: var(--bo-error-text, #922d39); }
+  .row-actions { white-space: nowrap; }
+  .row-actions :global(.bo-button) { margin: 3px 4px 3px 0; }
+  .modal-form { display: grid; gap: 16px; }
+  .modal-columns { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+  .modal-actions { justify-content: flex-end; border-top: 1px solid var(--bo-border, #d4e0e6); padding-top: 16px; }
+  @media (max-width: 780px) {
+    .panel { padding: 14px; }
+    .module-heading { align-items: flex-start; }
+    .modal-columns { grid-template-columns: 1fr; }
+    .row-actions { white-space: normal; }
+  }
 </style>

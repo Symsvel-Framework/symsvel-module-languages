@@ -180,6 +180,63 @@ final class TranslationCatalogTest extends TestCase
         }
     }
 
+    public function testHpStyleModalKeepsKeyImmutableAndDeveloperDeletionRemovesAllLanguages(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $translations->registerWithValue('bo', 'admins.example', 'Ancienne description', 'fr', 'Texte initial');
+            self::assertSame('Texte initial', $translations->entries('bo', 'fr', 'admins')[0]['value']);
+            $translations->save('bo', 'en', 'admins.example', 'English text');
+            $translations->updateKeyWithValue('bo', 'admins.example', 'Nouvelle description', 'fr', 'Texte modifié');
+            $rows = $translations->entries('bo', 'fr', 'admins');
+            self::assertSame('admins.example', $rows[0]['translation_key']);
+            self::assertSame('Nouvelle description', $rows[0]['description']);
+            self::assertSame('Texte modifié', $rows[0]['value']);
+            self::assertSame('English text', $translations->entries('bo', 'en', 'admins')[0]['value']);
+            $translations->deleteKey('bo', 'admins.example');
+            self::assertSame([], $translations->entries('bo', 'fr', 'admins'));
+            self::assertSame([], $translations->entries('bo', 'en', 'admins'));
+            self::assertSame(0, (int) $db->fetchOne(
+                'SELECT COUNT(*) FROM symsvel_translation_keys WHERE translation_key = ?',
+                ['admins.example'],
+            ));
+        } finally {
+            $db->close();
+        }
+    }
+
+    public function testDeveloperOnlyKeyDeletionIsEnforcedByServerRole(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $translations->registerWithValue('bo', 'admins.example', null, 'fr', 'Une valeur');
+            $request = \Symfony\Component\HttpFoundation\Request::create(
+                '/apibo/languages/translations/keys?scope=bo&key=admins.example', 'DELETE'
+            );
+            $gate = $this->createMock(\SymSvel\Module\Acls\Access\BoAccessGate::class);
+            $gate->method('check')->willReturn(
+                new \SymSvel\Module\Acls\Access\BoAccessDecision(200, 1, 'ROLE_SUPER_ADMIN')
+            );
+            $controller = new \SymSvel\Module\Languages\Controller\BoTranslationsController(
+                $gate, $translations, new TranslationCsvTransfer($db), 'dev', sys_get_temp_dir()
+            );
+            self::assertSame(403, $controller->deleteKey($request)->getStatusCode());
+            self::assertCount(1, $translations->entries('bo', 'fr', 'admins'));
+
+            $devGate = $this->createMock(\SymSvel\Module\Acls\Access\BoAccessGate::class);
+            $devGate->method('check')->willReturn(
+                new \SymSvel\Module\Acls\Access\BoAccessDecision(200, 2, 'ROLE_DEV')
+            );
+            $devController = new \SymSvel\Module\Languages\Controller\BoTranslationsController(
+                $devGate, $translations, new TranslationCsvTransfer($db), 'dev', sys_get_temp_dir()
+            );
+            self::assertSame(200, $devController->deleteKey($request)->getStatusCode());
+            self::assertSame([], $translations->entries('bo', 'fr', 'admins'));
+        } finally {
+            $db->close();
+        }
+    }
+
     public function testLegacyBoComponentsCustomizationsSurviveSystemNamespace(): void
     {
         [$translations, , $db] = $this->catalog();

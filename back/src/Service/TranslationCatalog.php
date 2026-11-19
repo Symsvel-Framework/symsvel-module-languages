@@ -191,6 +191,67 @@ final readonly class TranslationCatalog
         return ['scope' => $scope, 'translation_key' => $key, 'language' => $language, 'value' => $value];
     }
 
+    /**
+     * One atomic operation for the HP-style creation modal. The language may
+     * be the selected admin language; blank initial text leaves a missing key.
+     */
+    public function registerWithValue(
+        string $scope, string $key, ?string $description, string $language, string $value,
+    ): void {
+        $this->validateLanguage($language);
+        if (strlen($value) > 8192 || str_contains($value, "\0")) {
+            throw new \InvalidArgumentException('Invalid initial translation text.');
+        }
+        $this->db->transactional(function () use ($scope, $key, $description, $language, $value): void {
+            $this->registerKey($scope, $key, $description);
+            if ($value !== '') {
+                $this->save($scope, $language, $key, $value);
+            }
+        });
+    }
+
+    /** Keep the key immutable while editing its explanation and current translation. */
+    public function updateKeyWithValue(
+        string $scope, string $key, ?string $description, string $language, string $value,
+    ): void {
+        $this->validateScope($scope);
+        self::validateKey($key);
+        $this->validateLanguage($language);
+        if (($description !== null && (strlen($description) > 4096 || str_contains($description, "\0")))
+            || strlen($value) > 8192 || str_contains($value, "\0")) {
+            throw new \InvalidArgumentException('Invalid translation key metadata.');
+        }
+        $this->db->transactional(function () use ($scope, $key, $description, $language, $value): void {
+            if ($this->db->fetchOne(
+                'SELECT 1 FROM symsvel_translation_keys WHERE scope = ? AND translation_key = ?',
+                [$scope, $key],
+            ) === false) {
+                throw new \DomainException('Translation key does not exist.');
+            }
+            $this->db->update('symsvel_translation_keys',
+                ['description' => $description], ['scope' => $scope, 'translation_key' => $key]);
+            $this->save($scope, $language, $key, $value);
+        });
+    }
+
+    /** Delete a key and its translations, all languages. Controller restricts this to ROLE_DEV. */
+    public function deleteKey(string $scope, string $key): void
+    {
+        $this->validateScope($scope);
+        self::validateKey($key);
+        $this->db->transactional(function () use ($scope, $key): void {
+            $where = ['scope' => $scope, 'translation_key' => $key];
+            if ($this->db->fetchOne(
+                'SELECT 1 FROM symsvel_translation_keys WHERE scope = ? AND translation_key = ?',
+                [$scope, $key],
+            ) === false) {
+                throw new \DomainException('Translation key does not exist.');
+            }
+            $this->db->delete('symsvel_translations', $where);
+            $this->db->delete('symsvel_translation_keys', $where);
+        });
+    }
+
     public function delete(string $scope, string $language, string $key): void
     {
         $this->validateScope($scope);
