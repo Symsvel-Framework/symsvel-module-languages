@@ -205,6 +205,38 @@ final class TranslationCatalogTest extends TestCase
         }
     }
 
+    public function testDeveloperOnlyKeyDeletionIsEnforcedByServerRole(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $translations->registerWithValue('bo', 'admins.example', null, 'fr', 'Une valeur');
+            $request = \Symfony\Component\HttpFoundation\Request::create(
+                '/apibo/languages/translations/keys?scope=bo&key=admins.example', 'DELETE'
+            );
+            $gate = $this->createMock(\SymSvel\Module\Acls\Access\BoAccessGate::class);
+            $gate->method('check')->willReturn(
+                new \SymSvel\Module\Acls\Access\BoAccessDecision(200, 1, 'ROLE_SUPER_ADMIN')
+            );
+            $controller = new \SymSvel\Module\Languages\Controller\BoTranslationsController(
+                $gate, $translations, new TranslationCsvTransfer($db), 'dev', sys_get_temp_dir()
+            );
+            self::assertSame(403, $controller->deleteKey($request)->getStatusCode());
+            self::assertCount(1, $translations->entries('bo', 'fr', 'admins'));
+
+            $devGate = $this->createMock(\SymSvel\Module\Acls\Access\BoAccessGate::class);
+            $devGate->method('check')->willReturn(
+                new \SymSvel\Module\Acls\Access\BoAccessDecision(200, 2, 'ROLE_DEV')
+            );
+            $devController = new \SymSvel\Module\Languages\Controller\BoTranslationsController(
+                $devGate, $translations, new TranslationCsvTransfer($db), 'dev', sys_get_temp_dir()
+            );
+            self::assertSame(200, $devController->deleteKey($request)->getStatusCode());
+            self::assertSame([], $translations->entries('bo', 'fr', 'admins'));
+        } finally {
+            $db->close();
+        }
+    }
+
     public function testLegacyBoComponentsCustomizationsSurviveSystemNamespace(): void
     {
         [$translations, , $db] = $this->catalog();

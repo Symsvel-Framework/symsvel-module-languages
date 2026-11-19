@@ -117,6 +117,8 @@ final readonly class BoTranslationsController
             return self::error(400);
         }
         if (!is_array($data) || array_is_list($data) || count($data) !== 5
+            || !array_key_exists('description', $data)
+            || array_diff(array_keys($data), ['scope', 'key', 'description', 'language', 'value']) !== []
             || !is_string($data['scope'] ?? null) || !is_string($data['key'] ?? null)
             || (!is_string($data['description'] ?? null) && ($data['description'] ?? null) !== null)
             || !is_string($data['language'] ?? null) || !is_string($data['value'] ?? null)) {

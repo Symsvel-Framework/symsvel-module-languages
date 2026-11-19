@@ -198,6 +198,10 @@ final readonly class TranslationCatalog
     public function registerWithValue(
         string $scope, string $key, ?string $description, string $language, string $value,
     ): void {
+        $this->validateLanguage($language);
+        if (strlen($value) > 8192 || str_contains($value, "\0")) {
+            throw new \InvalidArgumentException('Invalid initial translation text.');
+        }
         $this->db->transactional(function () use ($scope, $key, $description, $language, $value): void {
             $this->registerKey($scope, $key, $description);
             if ($value !== '') {
