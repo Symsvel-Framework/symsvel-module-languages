@@ -5,12 +5,14 @@
   import Button from '../../../../../components/Button.svelte';
   import Alert from '../../../../../components/Alert.svelte';
   import Modal from '../../../../../components/Modal.svelte';
+  import Pagination from '../../../../../components/Pagination.svelte';
+  import { paginationState, type PageSize } from '../../../../../components/pagination';
   import Dropdown from '../../../../../components/Dropdown.svelte';
   import { languageFlag } from '../../../../../components/dropdown';
   import { ApiError } from '../../../../../api/client';
   import { boApi } from '../../../../../api/session';
   import { uiLanguage } from '../../../../../api/locales';
-  import { languageCopy, translationCopy, type BoLanguage } from '../../../presentation';
+  import { filterTranslationEntries, languageCopy, translationCopy, type BoLanguage } from '../../../presentation';
 
   type Translation = {
     scope: string; translation_key: string; language: string; value: string;
@@ -45,10 +47,13 @@
   const activeScopes = $derived(progress?.modules.find((module) => module.module === selectedModule)?.scopes ?? []);
   let search = $state('');
   let missingOnly = $state(false);
-  const filteredEntries = $derived(entries.filter((entry) =>
-    (!missingOnly || entry.missing_translation) &&
-    (entry.translation_key.toLowerCase().includes(search.toLowerCase()) ||
-      (entry.value || entry.fallback_value).toLowerCase().includes(search.toLowerCase()))
+  let page = $state(1);
+  let limit = $state<PageSize>(20);
+  const filteredEntries = $derived(filterTranslationEntries(entries, search, missingOnly));
+  const pagination = $derived(paginationState(page, limit, filteredEntries.length));
+  const visibleEntries = $derived(filteredEntries.slice(
+    (pagination.page - 1) * pagination.limit,
+    pagination.page * pagination.limit
   ));
   let key = $state('');
   let value = $state('');
@@ -115,6 +120,7 @@
     scope = module.scopes[0] ?? 'bo';
     search = '';
     missingOnly = false;
+    page = 1;
     key = '';
     value = '';
     description = '';
@@ -125,6 +131,7 @@
   function chooseLanguage(code: string): void {
     language = code;
     selectedModule = '';
+    page = 1;
     entries = [];
     editingKey = '';
     void loadModules();
@@ -508,6 +515,7 @@
                   onChange={(code) => {
                     scope = code as 'bo' | 'app' | 'front';
                     editingKey = '';
+                    page = 1;
                     void loadEntries();
                   }}
                   disabled={busy || !!savingRow || !!editingKey} />
@@ -520,8 +528,8 @@
         </div>
       </div>
       <div class="entry-filters">
-        <label>{t.searchTranslations}<input type="search" bind:value={search} placeholder={t.searchTranslations} disabled={!!editingKey} /></label>
-        <label class="checkbox-filter"><input type="checkbox" bind:checked={missingOnly} disabled={!!editingKey} /> {t.missingOnly}</label>
+        <label>{t.searchTranslations}<input type="search" bind:value={search} oninput={() => { page = 1; }} placeholder={t.searchTranslations} disabled={!!editingKey} /></label>
+        <label class="checkbox-filter"><input type="checkbox" bind:checked={missingOnly} onchange={() => { page = 1; }} disabled={!!editingKey} /> {t.missingOnly}</label>
       </div>
       {#if entries.length === 0}
         <p class="hint">{t.empty}</p>
@@ -530,7 +538,7 @@
           <table>
             <thead><tr><th>{t.key}</th><th>{t.description}</th><th>{t.value}</th><th>{t.status}</th><th>{t.actions}</th></tr></thead>
             <tbody>
-              {#each filteredEntries as entry (entry.translation_key)}
+              {#each visibleEntries as entry (entry.translation_key)}
                 <tr>
                   <td class="key-cell"><code>{entry.translation_key}</code></td>
                   <td class="explanation-cell">
@@ -575,6 +583,14 @@
             </tbody>
           </table>
         </div>
+        <Pagination
+          page={pagination.page}
+          limit={pagination.limit}
+          total={pagination.total}
+          loading={busy || !!savingRow || !!editingKey}
+          onPageChange={(next) => { page = next; }}
+          onLimitChange={(next) => { limit = next; page = 1; }}
+        />
       {/if}
     </section>
   {/if}

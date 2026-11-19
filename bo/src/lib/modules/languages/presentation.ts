@@ -39,6 +39,26 @@ export function languageCopy(locale: string | null): LanguageCopy {
     key, generatedTranslation(locale, `bo.languages.${key}`) ?? value
   ])) as LanguageCopy;
 }
+/** Search and missing-only filtering are performed before BO-host pagination. */
+export type TranslationListEntry = {
+  translation_key: string;
+  value: string;
+  fallback_value: string;
+  missing_translation: boolean;
+  description?: string | null;
+};
+
+export function filterTranslationEntries<T extends TranslationListEntry>(
+  rows: readonly T[], search: string, missingOnly: boolean
+): T[] {
+  const needle = search.trim().toLocaleLowerCase();
+  return rows.filter((entry) => (
+    (!missingOnly || entry.missing_translation) &&
+    [entry.translation_key, entry.value, entry.fallback_value, entry.description ?? '']
+      .some((text) => text.toLocaleLowerCase().includes(needle))
+  ));
+}
+
 export function filterLanguages(
   rows: BoLanguage[],
   search: string,

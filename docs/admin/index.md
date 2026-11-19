@@ -108,3 +108,9 @@ Sur une ligne, l'état initial est **du texte**, sans champ de saisie ni modale 
 ### Styles du bandeau HP (19/11/2026)
 
 Les classes `language-bar`, `language-bar__rows`, `language-bar__row`, `language-bar__label`, `language-bar__value` et `language-bar__switcher` conservent les proportions constatées dans le ZIP HP : deux rangées à gauche, libellés en capitales de 13 px et largeur 180 px, sélecteur à droite de 260 px, padding 14×18 px et rayon 18 px. Le rendu responsive passe sur deux lignes, sans masquage ni saut de page. Les couleurs utilisent les jetons sémantiques du BO SymSvel pour rester cohérentes en clair et en sombre. Les sélecteurs d'interface sont désormais des instances du même composant Dropdown.
+
+### Pagination du tableau Traductions (19/11/2026)
+
+Le tableau des clés d'un module utilise désormais le **composant `Pagination.svelte` natif du BO**, comme la liste des langues. Il affiche 20 lignes par défaut, avec un choix de 10 / 20 / 50 / 100 via le Dropdown commun, un compteur et les commandes première/précédente/suivante/dernière page. La recherche (clé, description, valeur et texte de secours) et le filtre *manquantes uniquement* s'appliquent à **tout le catalogue chargé**, avant découpage en pages. Leur modification remet sur la première page ; idem lors d'un changement de langue, module ou scope.
+
+L'édition et la validation en ligne conservent la page, les filtres et le scroll ; les commandes de pagination sont désactivées pendant l'édition d'une ligne. Après une suppression ou lorsqu'un filtre réduit le nombre de résultats, `paginationState` (BO hôte) borne automatiquement la page affichée à la dernière page disponible. Aucun appel API supplémentaire, aucun changement de route ou `location.reload()` n'est introduit. Tests des tailles et du découpage après filtres, puis CI d'assemblage et CT XT requis.
