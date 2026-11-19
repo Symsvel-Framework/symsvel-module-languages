@@ -78,3 +78,7 @@ Lorsqu'un module n'a de traductions que dans un seul scope (par exemple BO), l'�
 ### Parcours HP : état de l'éditeur (19/11/2026)
 
 L'écran maintient la langue, le module et le scope comme états Svelte distincts. La création et la modification utilisent une modale commune ; le nom de clé n'est plus modifiable en mode édition. Chaque ligne possède un brouillon de traduction indépendant ; sa validation actualise la ligne et réinterroge les compteurs, sans navigation ni perte de scroll. Import/export ont une interface cible distincte. La suppression de clé n'est affichée qu'avec la capacité DEV renvoyée par le backend.
+
+### Libellés UX HP (19/11/2026)
+
+Le module Languages déclare et traduit dans ses propres dictionnaires les textes du nouveau parcours : choix de langue toujours visible, Import / Export, chargement, actions, identifiant verrouillé dans la modale et suppression globale des clés. Les messages français et anglais restent alignés et les textes dynamiques passent par `translationCopy`, sans chaîne métier codée en dur dans Svelte.

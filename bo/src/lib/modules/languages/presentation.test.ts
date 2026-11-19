@@ -24,6 +24,8 @@ describe('Languages BO', () => {
     expect(translationCopy('en-US').export).toBe('Generate .ts file');
     expect(translationCopy('fr').missing).toBe('manquantes');
     expect(translationCopy('en').createKey).toBe('Create key');
+    expect(translationCopy('fr').keyLocked).toContain('ne peut pas');
+    expect(translationCopy('en').deleteKey).toBe('Delete key');
     expect(translationCopy('es').title).toBe('Traductions');
   });
   it('filters, sorts and localizes', () => {
