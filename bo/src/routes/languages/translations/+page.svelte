@@ -597,6 +597,27 @@
 
 <style>
   .page { width: 100%; max-width: 1400px; margin: 0 auto; display: grid; gap: 20px; }
+  /* HP AdminLanguageBar / LanguageContextBanner: exact layout proportions,
+     using SymSvel Design System colors for both themes. */
+  .language-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    flex-wrap: wrap; padding: 14px 18px;
+    border: 1px solid var(--bo-border, #d4e0e6); border-radius: 18px;
+    background: var(--bo-surface, #fff); color: var(--bo-text, #182b36);
+    box-shadow: var(--bo-shadow, 0 10px 28px rgba(0, 0, 0, 0.14));
+  }
+  .language-bar__rows { flex: 1 1 420px; min-width: 280px; display: grid; gap: 10px; }
+  .language-bar__row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .language-bar__label {
+    min-width: 180px; font-size: 13px; font-weight: 800;
+    color: var(--bo-muted, #667085); text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .language-bar__value { display: inline-flex; align-items: center; gap: 8px; color: var(--bo-text, #182b36); }
+  .language-bar__value strong { font-size: 15px; }
+  .language-bar__switcher { width: 260px; min-width: min(100%, 260px); }
+  .transfer-scope { width: 145px; }
+  .module-scope { width: 140px; }
+
   .page-heading, .module-heading {
     display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
   }
@@ -618,7 +639,6 @@
   input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
     outline: 2px solid var(--bo-focus, #148fa4); outline-offset: 2px;
   }
-  .language-block label { max-width: 420px; }
   .actions { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
   .transfer-block .actions { margin-bottom: 10px; }
   .transfer-block .actions label { width: 140px; }
@@ -663,6 +683,10 @@
   .modal-columns { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
   .modal-actions { justify-content: flex-end; border-top: 1px solid var(--bo-border, #d4e0e6); padding-top: 16px; }
   @media (max-width: 780px) {
+    .language-bar { align-items: stretch; }
+    .language-bar__rows { min-width: 0; flex-basis: 100%; }
+    .language-bar__label { min-width: 0; width: 170px; }
+    .language-bar__switcher { width: 100%; }
     .panel { padding: 14px; }
     .module-heading { align-items: flex-start; }
     .modal-columns { grid-template-columns: 1fr; }
