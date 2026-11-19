@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SymSvel\Module\Languages\Service;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 use SymSvel\Module\Settings\Service\SettingManager;
 
 /**
@@ -175,7 +176,7 @@ final readonly class TranslationCatalog
             }
             $updated = $this->db->update('symsvel_translations', ['text_value' => $value, 'customized' => true], [
                 'scope' => $scope, 'translation_key' => $key, 'language' => $language,
-            ]);
+            ], ['customized' => ParameterType::BOOLEAN]);
             if ($updated === 0 && !$this->db->fetchOne(
                 'SELECT 1 FROM symsvel_translations WHERE scope = ? AND translation_key = ? AND language = ?',
                 [$scope, $key, $language],
@@ -183,7 +184,7 @@ final readonly class TranslationCatalog
                 $this->db->insert('symsvel_translations', [
                     'scope' => $scope, 'translation_key' => $key, 'language' => $language, 'text_value' => $value,
                     'customized' => true,
-                ]);
+                ], ['customized' => ParameterType::BOOLEAN]);
             }
         });
 

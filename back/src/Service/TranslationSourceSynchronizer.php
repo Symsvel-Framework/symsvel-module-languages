@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SymSvel\Module\Languages\Service;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 
 /**
  * Imports only validated Tooling source data after migrations, without
@@ -105,14 +106,14 @@ final readonly class TranslationSourceSynchronizer
                     if ($legacyValue !== false && trim((string) $legacyValue) !== '') {
                         $this->db->insert('symsvel_translations', $where + [
                             'text_value' => (string) $legacyValue, 'customized' => true,
-                        ]);
+                        ], ['customized' => ParameterType::BOOLEAN]);
                         ++$result['texts_created'];
                         ++$result['protected'];
                         continue;
                     }
                     $this->db->insert('symsvel_translations', $where + [
                         'text_value' => $value, 'customized' => false,
-                    ]);
+                    ], ['customized' => ParameterType::BOOLEAN]);
                     ++$result['texts_created'];
                 } elseif (in_array($existing['customized'], [true, 1, '1', 't', 'true', 'TRUE'], true)) {
                     ++$result['protected'];

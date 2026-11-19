@@ -240,3 +240,8 @@ Les sous-clés des libellés de listes fixes (par exemple `auth.strengthLevels.0
 ### Compatibilité des textes de dashboard App
 
 Lors du déplacement des libellés d'accueil App depuis `auth.dashboard`/`auth.loggedIn` vers `system.dashboard.title`/`system.dashboard.loggedIn`, les traductions historiques présentes en BDD sont copiées dans les nouvelles clés canoniques et marquées `customized=true` si elles n'existent pas déjà. Les anciens enregistrements sont conservés. Un test couvre la conservation et l'idempotence de la synchronisation.
+
+
+### Correction multi-SGBD : typage de `customized` (19/11/2026)
+
+La colonne `symsvel_translations.customized` est un booléen Doctrine Schema, mais DBAL peut encoder un booléen PHP non typé comme une chaîne vide lors d'un `insert` / `update` (erreur MySQL `SQLSTATE[HY000] 1366 Incorrect integer value: ''`). Les opérations de synchronisation des sources, de sauvegarde dans le BO et d'import CSV utilisent désormais explicitement `Doctrine\\DBAL\\ParameterType::BOOLEAN`. Cette correction ne modifie ni la migration, ni la valeur par défaut des traductions historiques. Test d'intégration : valeur source = 0 ; valeur éditée dans le BO = 1, à valider également sur MySQL/MariaDB et PostgreSQL pendant les CT.

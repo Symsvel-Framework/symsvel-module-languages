@@ -149,6 +149,37 @@ final class TranslationCatalogTest extends TestCase
         }
     }
 
+    public function testCustomizedFlagIsSavedAsDatabaseBooleanAcrossSourceAndBoWrites(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        $file = tempnam(sys_get_temp_dir(), 'symsvel-i18n-boolean-');
+        try {
+            file_put_contents($file, json_encode(['schema' => 1, 'entries' => [[
+                'scope' => 'bo', 'module' => 'admins', 'key' => 'invite.title',
+                'language' => 'fr', 'value' => 'Inviter',
+            ]]], JSON_THROW_ON_ERROR));
+            $sync = new \SymSvel\Module\Languages\Service\TranslationSourceSynchronizer($db);
+            self::assertSame(1, $sync->sync($file)['texts_created']);
+            self::assertSame(0, (int) $db->fetchOne(
+                'SELECT customized FROM symsvel_translations WHERE scope = ? AND translation_key = ?',
+                ['bo', 'admins.invite.title'],
+            ));
+            $translations->save('bo', 'fr', 'admins.invite.title', 'Inviter maintenant');
+            self::assertSame(1, (int) $db->fetchOne(
+                'SELECT customized FROM symsvel_translations WHERE scope = ? AND translation_key = ?',
+                ['bo', 'admins.invite.title'],
+            ));
+            $translations->save('bo', 'fr', 'admins.invite.body', 'Texte personnalisé');
+            self::assertSame(1, (int) $db->fetchOne(
+                'SELECT customized FROM symsvel_translations WHERE scope = ? AND translation_key = ?',
+                ['bo', 'admins.invite.body'],
+            ));
+        } finally {
+            if (is_file($file)) unlink($file);
+            $db->close();
+        }
+    }
+
     public function testLegacyBoComponentsCustomizationsSurviveSystemNamespace(): void
     {
         [$translations, , $db] = $this->catalog();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SymSvel\Module\Languages\Service;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 
 /**
  * CSV exchange from production to local development. Import never deletes keys
@@ -121,14 +122,14 @@ final readonly class TranslationCsvTransfer
                         if ($apply) $this->db->insert('symsvel_translations', [
                             'scope' => $scope, 'translation_key' => $key,
                             'language' => $language, 'text_value' => $value, 'customized' => true,
-                        ]);
+                        ], ['customized' => ParameterType::BOOLEAN]);
                     } elseif ((string) $current !== $value) {
                         ++$summary['texts_updated'];
                         $textCache[$textId] = $value;
                         $changed = true;
                         if ($apply) $this->db->update('symsvel_translations', ['text_value' => $value, 'customized' => true], [
                             'scope' => $scope, 'translation_key' => $key, 'language' => $language,
-                        ]);
+                        ], ['customized' => ParameterType::BOOLEAN]);
                     }
                 }
                 if (!$changed) ++$summary['unchanged'];
