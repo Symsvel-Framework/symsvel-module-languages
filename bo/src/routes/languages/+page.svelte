@@ -131,6 +131,6 @@
   .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
   .page-heading h1 { margin: 0; }
   .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-  .page-heading p { color: #667085; }
-  .panel { padding: 24px; background: white; border: 1px solid #e2e7ee; border-radius: 14px; min-width: 0; }
+  .page-heading p { color: var(--bo-muted); }
+  .panel { padding: 24px; background: var(--bo-surface); color: var(--bo-text); border: 1px solid var(--bo-border); border-radius: 14px; min-width: 0; }
 </style>
