@@ -42,7 +42,9 @@ jobs:
         run: |
           mkdir -p assembled-bo/src/lib/modules/languages/routes/languages/translations
           mkdir -p assembled-bo/src/routes/languages/translations
+          mkdir -p assembled-bo/src/lib/translations/languages
           cp bo/src/lib/modules/languages/*.ts assembled-bo/src/lib/modules/languages/
+          cp bo/src/lib/translations/*.ts assembled-bo/src/lib/translations/languages/
           cp bo/src/routes/languages/+page.svelte assembled-bo/src/lib/modules/languages/routes/languages/+page.svelte
           cp bo/src/routes/languages/translations/+page.svelte assembled-bo/src/lib/modules/languages/routes/languages/translations/+page.svelte
           cat > assembled-bo/src/routes/languages/+page.svelte <<'ROUTE'

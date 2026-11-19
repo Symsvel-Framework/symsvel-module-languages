@@ -26,14 +26,17 @@ final readonly class TranslationCatalog
      *
      * @return list<array{scope:string,translation_key:string,description:?string,language:string,value:string,fallback_value:string,missing_translation:bool}>
      */
-    public function entries(string $scope, string $language): array
+    public function entries(string $scope, string $language, ?string $module = null): array
     {
         $this->validateScope($scope);
         $this->validateLanguage($language);
+        if ($module !== null && !preg_match('/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/D', $module)) {
+            throw new \InvalidArgumentException('Invalid translation module.');
+        }
         $keys = $this->db->fetchAllAssociative(
             'SELECT scope, translation_key, description FROM symsvel_translation_keys '
-            .'WHERE scope = ? ORDER BY translation_key',
-            [$scope],
+            .'WHERE scope = ?'.($module === null ? '' : ' AND translation_key LIKE ?').' ORDER BY translation_key',
+            $module === null ? [$scope] : [$scope, $module.'.%'],
         );
         $primary = $this->settings->get('languages.primary_language');
         if (!is_string($primary) || $primary === '') {
@@ -67,6 +70,61 @@ final readonly class TranslationCatalog
         }
 
         return $entries;
+    }
+
+    /**
+     * Count explicitly stored values for installed modules only. A missing or
+     * empty text is never counted as translated, even with a fallback.
+     *
+     * @param list<string> $installed
+     * @return array{language:string,modules:list<array{module:string,total:int,translated:int,missing:int,percent:?int}>,total:int,translated:int,missing:int,percent:?int}
+     */
+    public function moduleStatistics(string $language, array $installed): array
+    {
+        $this->validateLanguage($language);
+        $counts = [];
+        foreach (array_values(array_unique(array_merge(['system'], $installed))) as $module) {
+            if (!is_string($module) || !preg_match('/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/D', $module)) {
+                throw new \InvalidArgumentException('Invalid installed translation module.');
+            }
+            $counts[$module] = ['module' => $module, 'total' => 0, 'translated' => 0, 'scopes' => []];
+        }
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT k.scope, k.translation_key, t.text_value FROM symsvel_translation_keys k '
+            .'LEFT JOIN symsvel_translations t ON k.scope = t.scope '
+            .'AND k.translation_key = t.translation_key AND t.language = ? '
+            .'ORDER BY k.scope, k.translation_key',
+            [$language],
+        );
+        foreach ($rows as $row) {
+            $key = (string) $row['translation_key'];
+            $dot = strpos($key, '.');
+            if ($dot === false) continue; // Legacy keys without a declared owner.
+            $owner = substr($key, 0, $dot);
+            if (!isset($counts[$owner])) continue; // Removed/noninstalled module.
+            ++$counts[$owner]['total'];
+            $counts[$owner]['scopes'][(string) $row['scope']] = true;
+            if (is_string($row['text_value']) && trim($row['text_value']) !== '') {
+                ++$counts[$owner]['translated'];
+            }
+        }
+        $modules = [];
+        $total = $translated = 0;
+        foreach ($counts as $count) {
+            $count['scopes'] = array_values(array_intersect(['bo', 'app', 'front'], array_keys($count['scopes'])));
+            $count['missing'] = $count['total'] - $count['translated'];
+            $count['percent'] = $count['total'] > 0
+                ? (int) round(100 * $count['translated'] / $count['total']) : null;
+            $modules[] = $count;
+            $total += $count['total'];
+            $translated += $count['translated'];
+        }
+        return [
+            'language' => $language, 'modules' => $modules,
+            'total' => $total, 'translated' => $translated,
+            'missing' => $total - $translated,
+            'percent' => $total > 0 ? (int) round(100 * $translated / $total) : null,
+        ];
     }
 
     /**
@@ -115,7 +173,7 @@ final readonly class TranslationCatalog
                     'scope' => $scope, 'translation_key' => $key, 'description' => null,
                 ]);
             }
-            $updated = $this->db->update('symsvel_translations', ['text_value' => $value], [
+            $updated = $this->db->update('symsvel_translations', ['text_value' => $value, 'customized' => true], [
                 'scope' => $scope, 'translation_key' => $key, 'language' => $language,
             ]);
             if ($updated === 0 && !$this->db->fetchOne(
@@ -124,6 +182,7 @@ final readonly class TranslationCatalog
             )) {
                 $this->db->insert('symsvel_translations', [
                     'scope' => $scope, 'translation_key' => $key, 'language' => $language, 'text_value' => $value,
+                    'customized' => true,
                 ]);
             }
         });
@@ -142,7 +201,7 @@ final readonly class TranslationCatalog
     }
 
     /** @return array{filename:string,content:string,entries:int} */
-    public function export(string $scope, string $language): array
+    public function export(string $scope, string $language, bool $overridesOnly = false): array
     {
         $this->validateScope($scope);
         $this->validateLanguage($language);
@@ -155,13 +214,18 @@ final readonly class TranslationCatalog
         // Prefer French when available, then the configured site primary,
         // finally the requested language. The requested language always wins.
         $values = [];
-        foreach (array_unique([$primary, 'fr', $language]) as $code) {
+        // Build-time generated files must only override explicit admin/CSV
+        // customizations, not freeze defaults or fallback from module sources.
+        foreach (array_unique($overridesOnly ? [$language] : [$primary, 'fr', $language]) as $code) {
             $rows = $this->db->fetchAllAssociative(
-                'SELECT translation_key, text_value FROM symsvel_translations WHERE scope = ? AND language = ? '
+                'SELECT translation_key, text_value, customized FROM symsvel_translations WHERE scope = ? AND language = ? '
                 .'ORDER BY translation_key',
                 [$scope, $code],
             );
             foreach ($rows as $row) {
+                if ($overridesOnly && !in_array($row['customized'], [true, 1, '1', 't', 'true', 'TRUE'], true)) {
+                    continue;
+                }
                 $value = (string) $row['text_value'];
                 if (trim($value) !== '') {
                     $values[(string) $row['translation_key']] = $value;
@@ -200,7 +264,17 @@ final readonly class TranslationCatalog
             unset($item);
         };
         $sortNested($dictionary);
-        $json = json_encode($dictionary === [] ? new \stdClass() : $dictionary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+        // Numeric key segments must remain JSON object properties, not arrays.
+        // PHP turns numeric-string array keys into integers; encode each node
+        // as an object so Svelte can resolve `strengthLevels.0` as a dotted key.
+        $toObject = static function (array $node) use (&$toObject): \stdClass {
+            $object = new \stdClass();
+            foreach ($node as $key => $value) {
+                $object->{(string) $key} = is_array($value) ? $toObject($value) : $value;
+            }
+            return $object;
+        };
+        $json = json_encode($toObject($dictionary), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
             | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP
             | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
         return [

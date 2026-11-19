@@ -178,9 +178,9 @@ La majorité des traductions étant produite en production, le flux validé est 
 
 Routes \`/apibo/languages/translations/export/csv\` (GET, ACL \`languages.manage\`) et \`/apibo/languages/translations/import/csv\` (POST, ACL \`languages.manage\`, **route déclarée uniquement pour les environnements dev/test**, client loopback). JSON de l'import : \`{csv,mode:"preview"}\` puis \`{csv,mode:"apply",sha256:"..."}\` ; la réponse fournit le nombre de clés/textes créés, modifiés et inchangés. \`GET /apibo/languages/translations/csv-capabilities\` permet au BO de présenter les opérations disponibles. Aucune opération d'import n'est exposée dans le routage de production.
 
-**Écriture locale des dictionnaires :** \`POST /apibo/languages/translations/publish\` n'est routé **qu'en dev**, exige les ACL et une connexion loopback. Il accepte uniquement \`{scope,language}\` ; \`TranslationCatalog\` construit le contenu TS de façon déterministe, puis \`SymSvel\Tooling\I18n\TranslationFilePublisher\`, présent uniquement en développement, publie sous \`<workspace>/<scope>/src/lib/i18n/generated/<language>.ts\`. L'écrivain refuse les chemins/symlinks invalides, les composants non installés et les fichiers non identifiés par la signature SymSvel, écrit temporairement puis renomme de façon atomique ; il ne lance ni npm ni build. La route n'existe pas en prod et Tooling n'y est pas une dépendance requise. L'API ne transmet jamais au client de chemin absolu du serveur.
+**Écriture locale des dictionnaires :** \`POST /apibo/languages/translations/publish\` n'est routé **qu'en dev**, exige les ACL et une connexion loopback. Il accepte uniquement \`{scope,language}\` ; \`TranslationCatalog\` construit le contenu TS de façon déterministe, puis \`SymSvel\Tooling\I18n\TranslationFilePublisher\`, présent uniquement en développement, publie sous \`<workspace>/<scope>/src/lib/translations/generated/<language>.ts\`. L'écrivain refuse les chemins/symlinks invalides, les composants non installés et les fichiers non identifiés par la signature SymSvel, écrit temporairement puis renomme de façon atomique ; il ne lance ni npm ni build. La route n'existe pas en prod et Tooling n'y est pas une dépendance requise. L'API ne transmet jamais au client de chemin absolu du serveur.
 
-**Limites à vérifier au CT :** correspondance des dossiers de composants en cas de renommage du mapping, capacité réelle du serveur PHP local à écrire dans les sources Svelte du workspace, consommation effective de \`src/lib/i18n/generated/<lang>.ts\` par les autres pages métier (helpers et premiers consommateurs BO/App raccordés), et exploitation du Git/CD depuis les répertoires des projets. Le fichier seul n'actualise pas les écrans avant intégration au bundle. Aucune compilation ni synchronisation prod des sources n'est proposée. CI et CT utilisateur requis avant clôture.
+**Limites à vérifier au CT :** correspondance des dossiers de composants en cas de renommage du mapping, capacité réelle du serveur PHP local à écrire dans les sources Svelte du workspace, consommation effective de \`src/lib/translations/generated/<lang>.ts\` par les autres pages métier (helpers et premiers consommateurs BO/App raccordés), et exploitation du Git/CD depuis les répertoires des projets. Le fichier seul n'actualise pas les écrans avant intégration au bundle. Aucune compilation ni synchronisation prod des sources n'est proposée. CI et CT utilisateur requis avant clôture.
 
 
 ### Premier raccordement des dictionnaires aux hôtes (17/11/2026)
@@ -191,3 +191,52 @@ BO, App et Front disposent maintenant du helper `src/lib/i18n/generated-translat
 ### Contrôle fin des opérations du BO (17/11/2026)
 
 L'endpoint de capacités CSV accepte les acteurs possédant `languages.list`, afin de ne pas bloquer la lecture de l'éditeur. Il annonce `can_export`, `can_import` et `can_publish` uniquement si `languages.manage` est accordé, avec les restrictions d'environnement et de loopback propres aux opérations locales. Les endpoints de mutation continuent à appliquer l'ACL serveur indépendamment de l'état des boutons. Les routes d'import et de publication sont absentes en production par déclaration `env` Symfony.
+
+
+## Dictionnaires des modules et synchronisation post-migrations (18/11/2026, dev)
+
+Tooling recense les dictionnaires JSON-compatibles `.ts` de chaque scope installé et des hôtes natifs (`system`) dans `backend/.symsvel/translation-sources.json` (schéma 1). Le module Languages est seul propriétaire de la persistance ; la commande locale `symsvel:languages:translations:sync`, orchestrée après migrations, valide intégralement le manifeste puis enregistre les clés `scope + module.key` et les textes dans une transaction DBAL. Les clés publiques suivent `<scope>.<module|system>.<key>`, sans double stockage du scope.
+
+Migration Schema `Version20261118000001` : la colonne `customized` vaut vrai par défaut sur les anciennes traductions, pour les protéger. Le synchroniseur inscrit les nouveaux textes source avec `customized=false` et ne met à jour que ces valeurs ; une édition BO ou un import CSV marque `customized=true`. Les langues inactives peuvent recevoir leurs textes de référence, mais demeurent non éditables depuis le BO jusqu'à leur activation ou préouverture. Les clés sans valeur sont néanmoins inscrites. La suppression BO d'une valeur rétablit la possibilité d'installer la valeur par défaut lors de la prochaine synchronisation.
+
+Ce mécanisme ne reconstruit pas les fichiers Svelte et ne publie rien en production ; Tooling reste chargé de la synchronisation des sources puis le build Git/CD incorpore les dictionnaires. Tests de migrations compilées PG/MySQL et crash-tests XT requis avant validation.
+
+
+## Dictionnaires propres à Languages (18/11/2026)
+
+Les libellés BO de Languages sont fournis sous `bo/src/lib/translations/fr.ts` et `en.ts`, en incluant le sous-ensemble `translations`. Tooling copie ces fichiers dans l'hôte sous `lib/translations/languages`, les indexe en BDD et applique les surcharges publiées sous `lib/translations/generated`. Convention : `bo.languages.<clé>`. Le contrôleur de publication annonce désormais le nouveau chemin.
+
+
+## Indicateurs par module installé (18/11/2026)
+
+`TranslationCatalog::moduleStatistics()` calcule les effectifs à partir de `symsvel_translation_keys` et des textes réellement stockés pour la langue demandée. Le propriétaire est le premier segment de `translation_key`, le scope restant distinct. Les modules affichés viennent exclusivement de `backend/.symsvel/modules.json` produit par Tooling ; `system` représente les clés natives des hôtes. Les traductions de modules désinstallés ne sont pas affichées. Une langue manquante ou une valeur vide n'est jamais comptée comme traduite, et aucun fallback ne gonfle le numérateur. Un module sans clé a un pourcentage nul (`null`), et la progression globale est pondérée par le nombre de clés. Routes BO `GET /apibo/languages/translations/modules?language=en` et filtre optionnel `module` sur `GET /apibo/languages/translations` (ACL `languages.list`).
+
+### Compatibilité des personnalisations natives BO
+
+Lorsqu'une valeur native du BO passe de `components.<clé>` à `system.<clé>`, la synchronisation initiale détecte l'ancienne traduction personnalisée, la copie dans la clé canonique et la protège avec `customized=true`. L'ancienne clé n'est pas supprimée sans confirmation : elle reste consultable pour l'historique et le repli des builds existants. Les valeurs canoniques déjà personnalisées gardent toujours priorité. Un test d'intégration couvre cette migration non destructive.
+
+Le champ `scopes` des statistiques est calculé à partir des clés réellement enregistrées pour chaque propriétaire. L'éditeur propose le choix BO/App/Front uniquement lorsqu'au moins deux scopes contiennent des clés ; pour un seul scope, celui-ci est affiché sans liste déroulante. Les modules sans clés restent visibles, avec « aucune clé déclarée ».
+
+### Assemblage de test du BO
+
+La CI d'intégration monte les dictionnaires du module Languages sous `src/lib/translations/languages`, comme le synchroniseur Tooling. Le test de présentation utilise ces chemins d'hôte, au lieu de tenter d'importer les fichiers source non installés. Le contrat est ainsi validé sur le BO assemblé, sans mettre les dictionnaires dans Back/Core.
+
+### Clé `translations` réservée au lien du module
+
+Le libellé de navigation `bo.languages.translations` est un texte simple (« Traductions »). Les champs de l'écran d'édition sont regroupés sous `bo.languages.editor.*`, et non `bo.languages.translations.*`, afin d'éviter un conflit entre un texte et un objet lors de l'export TypeScript imbriqué. Une assertion de la CI verrouille les deux formes de clé.
+
+Le propriétaire `generated` est réservé au dossier des surcharges publiées : le synchroniseur Languages refuse tout enregistrement source prétendant provenir d'un module de ce nom. `system` reste autorisé uniquement pour les dictionnaires natifs validés par Tooling. Un test d'intégration vérifie le refus sans aucune écriture en base.
+
+
+### Export des clés à index numérique
+
+Les sous-clés des libellés de listes fixes (par exemple `auth.strengthLevels.0`) doivent toujours être sérialisées en **propriétés d'objet JSON**, et non en tableaux JSON. Le catalogue construit les dictionnaires imbriqués puis convertit chaque nœud en objet avant l'encodage. Ce contrat est nécessaire au chargeur Svelte, qui accède à chaque segment d'une clé sans interpréter les tableaux comme des traductions. Un test d'intégration couvre `strengthLevels.0` et `.1`.
+
+
+### Publication `.ts` : uniquement les surcharges personnalisées
+
+`GET /apibo/languages/translations/export` conserve son export complet (valeurs + fallbacks) pour téléchargement et audit. En revanche, l'action BO de publication locale appelle `TranslationCatalog::export(scope, langue, overridesOnly: true)`, qui inclut uniquement les textes explicitement marqués `customized=true` pour la langue demandée. Les valeurs sources non personnalisées et les fallbacks ne sont **jamais recopiés** dans `src/lib/translations/generated/<lang>.ts`, afin qu'une mise à jour de module puisse effectivement renouveler ses textes par défaut. Les autres langues conservent leur propre dictionnaire de surcharges ; le helper statique applique le repli clé par clé. Une couverture d'intégration compare explicitement publication ciblée et export complet.
+
+### Compatibilité des textes de dashboard App
+
+Lors du déplacement des libellés d'accueil App depuis `auth.dashboard`/`auth.loggedIn` vers `system.dashboard.title`/`system.dashboard.loggedIn`, les traductions historiques présentes en BDD sont copiées dans les nouvelles clés canoniques et marquées `customized=true` si elles n'existent pas déjà. Les anciens enregistrements sont conservés. Un test couvre la conservation et l'idempotence de la synchronisation.

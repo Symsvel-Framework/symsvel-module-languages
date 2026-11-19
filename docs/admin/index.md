@@ -59,3 +59,18 @@ Dans le BO de développement local, **Importer les traductions** permet de séle
 Toujours depuis le BO de développement local, le bouton **Écrire le .ts en local** délègue l'enregistrement au Tooling, pour l'interface et la langue affichées. Le résultat est enregistré à l'emplacement \`<scope>/src/lib/i18n/generated/<lang>.ts\`. Ce fichier doit ensuite être intégré à la lecture i18n des pages, versionné et publié par le circuit Git/CD ; aucun rebuild n'est lancé automatiquement. Le téléchargement manuel d'un fichier .ts reste possible.
 
 En production, la création ou modification d'une entrée en BDD n'est pas immédiatement visible dans les interfaces statiques : elle apparaît après son import dans dev, la mise à jour des sources et le déploiement CD. La gestion de cache/Redis est hors de ce chantier.
+
+
+## Textes fournis par les modules
+
+Les dictionnaires de référence d'un module sont enregistrés lors de l'installation, après les migrations. Les textes personnalisés depuis le BO ou importés depuis un CSV sont protégés lors des mises à jour du module. Les nouvelles valeurs par défaut ne remplacent que les textes non personnalisés. La convention complète est `<scope>.<module|system>.<key>` ; `system` ne correspond qu'aux composants natifs des hôtes Svelte. L'édition BO n'exige pas d'activer le multilinguisme.
+
+
+## Parcours de traduction par langue puis module (18/11/2026)
+
+L'administrateur choisit d'abord la langue active ou préouverte, puis un des modules réellement installés ou la rubrique Système. La liste affiche un pourcentage calculé sur les clés déclarées, le nombre traduit/manquant et une progression. Zéro clé ne signifie pas 100 %. Dans le module, l'administrateur choisit éventuellement BO/App/Front, filtre/recherche puis édite les clés préfixées du module. Les imports/exports CSV conservent leur portée globale, et l'export `.ts` reste par scope et langue. La CI et les CT XT doivent confirmer le parcours et les droits ACL.
+
+Lorsqu'un module n'a de traductions que dans un seul scope (par exemple BO), l'éditeur n'affiche pas de sélecteur BO/App/Front inutile. Plusieurs scopes déclarés restent sélectionnables dans le module, sans modifier la langue courante.
+
+
+**Publication TypeScript :** le fichier local généré à partir du BO ne contient que les traductions volontairement personnalisées. Les textes livrés avec un module restent dans son propre dictionnaire, mis à jour par Tooling ; un fichier généré ne les fige donc pas. Le téléchargement de l'export complet reste disponible séparément, avec fallbacks, pour les échanges ou l'audit.

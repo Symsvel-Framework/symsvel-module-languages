@@ -120,13 +120,13 @@ final readonly class TranslationCsvTransfer
                         $changed = true;
                         if ($apply) $this->db->insert('symsvel_translations', [
                             'scope' => $scope, 'translation_key' => $key,
-                            'language' => $language, 'text_value' => $value,
+                            'language' => $language, 'text_value' => $value, 'customized' => true,
                         ]);
                     } elseif ((string) $current !== $value) {
                         ++$summary['texts_updated'];
                         $textCache[$textId] = $value;
                         $changed = true;
-                        if ($apply) $this->db->update('symsvel_translations', ['text_value' => $value], [
+                        if ($apply) $this->db->update('symsvel_translations', ['text_value' => $value, 'customized' => true], [
                             'scope' => $scope, 'translation_key' => $key, 'language' => $language,
                         ]);
                     }

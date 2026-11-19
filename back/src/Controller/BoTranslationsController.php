@@ -32,8 +32,37 @@ final readonly class BoTranslationsController
             return self::reply(['data' => $this->translations->entries(
                 (string) $request->query->get('scope', ''),
                 (string) $request->query->get('language', ''),
+                is_string($request->query->get('module')) ? $request->query->get('module') : null,
             )]);
         } catch (\InvalidArgumentException) {
+            return self::error(400);
+        } catch (\DomainException) {
+            return self::error(409);
+        }
+    }
+
+    /** Installed Composer module inventory was published by Tooling: no runtime package scan. */
+    #[Route('/apibo/languages/translations/modules', name: 'symsvel_languages_translations_modules', methods: ['GET'], format: 'json')]
+    public function modules(Request $request): JsonResponse
+    {
+        if (($error = $this->authorize($request, 'list')) !== null) return $error;
+        $index = $this->backendDir.'/.symsvel/modules.json';
+        if (is_link($index) || !is_file($index) || !is_readable($index)) return self::error(503);
+        try {
+            $data = json_decode((string) file_get_contents($index), true, 32, JSON_THROW_ON_ERROR);
+            if (!is_array($data) || ($data['schema'] ?? null) !== 1
+                || !is_array($data['modules'] ?? null) || !array_is_list($data['modules'])) {
+                return self::error(503);
+            }
+            $slugs = [];
+            foreach ($data['modules'] as $module) {
+                if (!is_array($module) || !is_string($module['module'] ?? null)) return self::error(503);
+                $slugs[] = $module['module'];
+            }
+            return self::reply(['data' => $this->translations->moduleStatistics(
+                (string) $request->query->get('language', ''), $slugs,
+            )]);
+        } catch (\JsonException | \InvalidArgumentException) {
             return self::error(400);
         } catch (\DomainException) {
             return self::error(409);
@@ -194,12 +223,12 @@ final readonly class BoTranslationsController
         if (!is_array($data) || array_is_list($data) || count($data) !== 2
             || !is_string($data['scope'] ?? null) || !is_string($data['language'] ?? null)) return self::error(400);
         try {
-            $dictionary = $this->translations->export($data['scope'], $data['language']);
+            $dictionary = $this->translations->export($data['scope'], $data['language'], true);
             $result = (new \SymSvel\Tooling\I18n\TranslationFilePublisher())->publish(
                 $this->backendDir, $data['scope'], $data['language'], $dictionary['content'],
             );
             return self::reply(['data' => [
-                'file' => $data['scope'].'/src/lib/i18n/generated/'.$data['language'].'.ts',
+                'file' => $data['scope'].'/src/lib/translations/generated/'.$data['language'].'.ts',
                 'changed' => $result['changed'],
                 'entries' => $dictionary['entries'],
             ]]);

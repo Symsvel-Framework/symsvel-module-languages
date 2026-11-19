@@ -36,7 +36,7 @@ export type LanguageCopy = (typeof copy)['fr'];
 export function languageCopy(locale: string | null): LanguageCopy {
   const base = locale?.toLowerCase().split('-')[0] === 'en' ? copy.en : copy.fr;
   return Object.fromEntries(Object.entries(base).map(([key, value]) => [
-    key, generatedTranslation(locale, `languages.${key}`) ?? value
+    key, generatedTranslation(locale, `bo.languages.${key}`) ?? value
   ])) as LanguageCopy;
 }
 export function filterLanguages(
@@ -75,6 +75,7 @@ const translationLabels = {
     csvApply: 'Importer les changements', csvImported: 'Traductions importées.',
     csvRows: 'Lignes', csvKeysNew: 'Clés ajoutées', csvKeysUpdated: 'Descriptions mises à jour',
     csvTextsNew: 'Textes ajoutés', csvTextsUpdated: 'Textes remplacés', csvUnchanged: 'Sans changement',
+    chooseModule: 'Choisir un module', backModules: 'Retour aux modules', system: 'Système', translatedCount: 'clés traduites', noKeys: 'Aucune clé déclarée', searchTranslations: 'Rechercher une traduction', missingOnly: 'Afficher uniquement les manquantes',
     failure: 'Impossible de traiter les traductions.'
   },
   en: {
@@ -95,6 +96,7 @@ const translationLabels = {
     csvApply: 'Apply changes', csvImported: 'Translations imported.',
     csvRows: 'Rows', csvKeysNew: 'Keys created', csvKeysUpdated: 'Descriptions updated',
     csvTextsNew: 'Texts created', csvTextsUpdated: 'Texts replaced', csvUnchanged: 'Unchanged',
+    chooseModule: 'Choose a module', backModules: 'Back to modules', system: 'System', translatedCount: 'translated keys', noKeys: 'No declared keys', searchTranslations: 'Search translations', missingOnly: 'Show missing only',
     failure: 'Cannot process translations.'
   }
 };
@@ -102,6 +104,6 @@ export type TranslationCopy = (typeof translationLabels)['fr'];
 export function translationCopy(locale: string | null): TranslationCopy {
   const base = locale?.toLowerCase().split('-')[0] === 'en' ? translationLabels.en : translationLabels.fr;
   return Object.fromEntries(Object.entries(base).map(([key, value]) => [
-    key, generatedTranslation(locale, `languages.translations.${key}`) ?? value
+    key, generatedTranslation(locale, `bo.languages.editor.${key}`) ?? value
   ])) as TranslationCopy;
 }
