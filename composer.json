@@ -9,8 +9,8 @@
         "symfony/console": "^8.1",
         "symfony/framework-bundle": "^8.1",
         "symfony/intl": "^8.1",
-        "symsvel-framework/module-settings": "dev-dev",
-        "symsvel-framework/module-acls": "dev-dev"
+        "symsvel-framework/module-settings": "^1.0",
+        "symsvel-framework/module-acls": "^1.0"
     },
     "autoload": {
         "psr-4": {
