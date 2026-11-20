@@ -1,0 +1,450 @@
+<?php
+
+declare(strict_types=1);
+
+namespace SymSvel\Module\Languages\Tests\Integration;
+
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Schema\Schema;
+use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\ORMSetup;
+use Doctrine\ORM\Tools\SchemaTool;
+use Doctrine\Persistence\ManagerRegistry;
+use PHPUnit\Framework\TestCase;
+use SymSvel\Module\Languages\Service\LanguageCatalog;
+use SymSvel\Module\Languages\Service\LanguagesSettingDefinitionProvider;
+use SymSvel\Module\Languages\Service\TranslationCatalog;
+use SymSvel\Module\Languages\Service\TranslationCsvTransfer;
+use SymSvel\Module\Settings\Entity\Setting;
+use SymSvel\Module\Settings\Repository\SettingRepository;
+use SymSvel\Module\Settings\Service\SettingKeyQualifier;
+use SymSvel\Module\Settings\Service\SettingManager;
+use SymSvel\Module\Settings\Service\SettingRegistry;
+use SymSvel\Module\Settings\Service\SettingSecretCipher;
+
+final class TranslationCatalogTest extends TestCase
+{
+    private function catalog(): array
+    {
+        if (!extension_loaded('pdo_sqlite')) self::markTestSkipped('pdo_sqlite required.');
+        $config = ORMSetup::createAttributeMetadataConfiguration(
+            paths: [dirname((new \ReflectionClass(Setting::class))->getFileName())], isDevMode: true,
+        );
+        $config->enableNativeLazyObjects(true);
+        $db = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        $em = new EntityManager($db, $config);
+        (new SchemaTool($em))->createSchema([$em->getClassMetadata(Setting::class)]);
+
+        $schema = new Schema();
+        $languages = $schema->createTable('symsvel_languages');
+        $languages->addColumn('iso_code', 'string', ['length' => 20]);
+        $languages->addColumn('name', 'string', ['length' => 150]);
+        $languages->addColumn('active', 'boolean', ['default' => false]);
+        $languages->addColumn('pre_open', 'boolean', ['default' => false]);
+        $languages->setPrimaryKey(['iso_code']);
+        require_once dirname(__DIR__, 2).'/../Migration/Version20261117000003.php';
+        $migration = (new \ReflectionClass(\DoctrineMigrations\Version20261117000003::class))
+            ->newInstanceWithoutConstructor();
+        $migration->up($schema);
+        require_once dirname(__DIR__, 2).'/../Migration/Version20261117000004.php';
+        $keysMigration = (new \ReflectionClass(\DoctrineMigrations\Version20261117000004::class))
+            ->newInstanceWithoutConstructor();
+        $keysMigration->up($schema);
+        require_once dirname(__DIR__, 2).'/../Migration/Version20261118000001.php';
+        $sourceMigration = (new \ReflectionClass(\DoctrineMigrations\Version20261118000001::class))
+            ->newInstanceWithoutConstructor();
+        $sourceMigration->up($schema);
+        foreach ($schema->toSql($db->getDatabasePlatform()) as $sql) $db->executeStatement($sql);
+        foreach (['fr', 'en', 'de'] as $code) {
+            $db->insert('symsvel_languages', [
+                'iso_code' => $code, 'name' => $code, 'active' => false, 'pre_open' => false,
+            ]);
+        }
+
+        $registry = $this->createMock(ManagerRegistry::class);
+        $registry->method('getManagerForClass')->with(Setting::class)->willReturn($em);
+        $settingsRegistry = new SettingRegistry([]);
+        $settingsRegistry->registerOwned(new LanguagesSettingDefinitionProvider(), 'languages', new SettingKeyQualifier());
+        $settings = new SettingManager($settingsRegistry, new SettingRepository($registry), $em,
+            new SettingSecretCipher('translation-test'));
+        $catalog = new LanguageCatalog($db, $settings);
+        $catalog->initializePrimary('fr');
+        $catalog->update('en', false, true);
+        return [new TranslationCatalog($db, $catalog, $settings), $catalog, $db];
+    }
+
+    public function testEditingExportFallbackIsolationAndDeletion(): void
+    {
+        [$translations, $languages, $db] = $this->catalog();
+        try {
+            $translations->save('bo', 'fr', 'auth.signIn', 'Connexion');
+            $translations->save('bo', 'fr', 'navigation.home', 'Accueil');
+            $translations->save('bo', 'en', 'auth.signIn', 'Sign in');
+            $translations->save('app', 'fr', 'auth.signIn', 'Espace client');
+            self::assertCount(2, $translations->entries('bo', 'en'));
+            self::assertCount(0, $translations->entries('bo', 'en', 'admins'));
+            self::assertCount(1, $translations->entries('bo', 'en', 'auth'));
+            $stats = $translations->moduleStatistics('en', ['auth', 'admins']);
+            self::assertSame(2, $stats['total']);
+            self::assertSame(1, $stats['translated']);
+            self::assertSame(1, $stats['missing']);
+            self::assertSame(50, $stats['percent']);
+            self::assertNull($stats['modules'][2]['percent']);
+            self::assertSame(['bo', 'app'], $stats['modules'][1]['scopes']);
+            self::assertSame([], $stats['modules'][2]['scopes']);
+            self::assertTrue($translations->entries('bo', 'en')[1]['missing_translation']);
+            self::assertSame('Accueil', $translations->entries('bo', 'en')[1]['fallback_value']);
+            self::assertCount(2, $translations->entries('bo', 'fr'));
+            $export = $translations->export('bo', 'en');
+            self::assertSame('translations.bo.en.ts', $export['filename']);
+            self::assertSame(2, $export['entries']);
+            self::assertStringContainsString('"auth": {', $export['content']);
+            self::assertStringContainsString('"signIn": "Sign in"', $export['content']);
+            self::assertStringContainsString('"navigation": {', $export['content']);
+            self::assertStringContainsString('"home": "Accueil"', $export['content']);
+            self::assertStringNotContainsString('Espace client', $export['content']);
+            self::assertSame($export['content'], $translations->export('bo', 'en')['content']);
+
+            $translations->save('bo', 'en', 'auth.signIn', 'Log in');
+            self::assertSame('Log in', $translations->entries('bo', 'en')[0]['value']);
+            $translations->delete('bo', 'en', 'auth.signIn');
+            self::assertCount(2, $translations->entries('bo', 'en'));
+            self::assertSame('', $translations->entries('bo', 'en')[0]['value']);
+            self::assertTrue($translations->entries('bo', 'en')[0]['missing_translation']);
+            self::assertStringContainsString('Connexion', $translations->export('bo', 'en')['content']);
+
+            $languages->update('en', false, false);
+            $this->expectException(\DomainException::class);
+            $translations->export('bo', 'en');
+        } finally {
+            $db->close();
+        }
+    }
+
+    public function testSourceSyncIsIdempotentAndPreservesBoCustomizations(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        $file = tempnam(sys_get_temp_dir(), 'symsvel-i18n-source-');
+        try {
+            $payload = ['schema' => 1, 'entries' => [
+                ['scope' => 'bo', 'module' => 'admins', 'key' => 'invite.title', 'language' => 'fr', 'value' => 'Inviter'],
+                ['scope' => 'bo', 'module' => 'admins', 'key' => 'invite.title', 'language' => 'en', 'value' => 'Invite'],
+            ]];
+            file_put_contents($file, json_encode($payload, JSON_THROW_ON_ERROR));
+            $sync = new \SymSvel\Module\Languages\Service\TranslationSourceSynchronizer($db);
+            self::assertSame(2, $sync->sync($file)['texts_created']);
+            self::assertSame(0, $sync->sync($file)['texts_created']);
+            self::assertSame(0, $sync->sync($file)['texts_updated']);
+            $translations->save('bo', 'fr', 'admins.invite.title', 'Invitation personnalisée');
+            $payload['entries'][0]['value'] = 'Nouvelle valeur source';
+            $payload['entries'][1]['value'] = 'Updated invite';
+            file_put_contents($file, json_encode($payload, JSON_THROW_ON_ERROR));
+            $result = $sync->sync($file);
+            self::assertSame(1, $result['texts_updated']);
+            self::assertSame('Invitation personnalisée', $translations->entries('bo', 'fr')[0]['value']);
+            self::assertSame('Updated invite', $translations->entries('bo', 'en')[0]['value']);
+        } finally {
+            if (is_file($file)) unlink($file);
+            $db->close();
+        }
+    }
+
+    public function testCustomizedFlagIsSavedAsDatabaseBooleanAcrossSourceAndBoWrites(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        $file = tempnam(sys_get_temp_dir(), 'symsvel-i18n-boolean-');
+        try {
+            file_put_contents($file, json_encode(['schema' => 1, 'entries' => [[
+                'scope' => 'bo', 'module' => 'admins', 'key' => 'invite.title',
+                'language' => 'fr', 'value' => 'Inviter',
+            ]]], JSON_THROW_ON_ERROR));
+            $sync = new \SymSvel\Module\Languages\Service\TranslationSourceSynchronizer($db);
+            self::assertSame(1, $sync->sync($file)['texts_created']);
+            self::assertSame(0, (int) $db->fetchOne(
+                'SELECT customized FROM symsvel_translations WHERE scope = ? AND translation_key = ?',
+                ['bo', 'admins.invite.title'],
+            ));
+            $translations->save('bo', 'fr', 'admins.invite.title', 'Inviter maintenant');
+            self::assertSame(1, (int) $db->fetchOne(
+                'SELECT customized FROM symsvel_translations WHERE scope = ? AND translation_key = ?',
+                ['bo', 'admins.invite.title'],
+            ));
+            $translations->save('bo', 'fr', 'admins.invite.body', 'Texte personnalisé');
+            self::assertSame(1, (int) $db->fetchOne(
+                'SELECT customized FROM symsvel_translations WHERE scope = ? AND translation_key = ?',
+                ['bo', 'admins.invite.body'],
+            ));
+        } finally {
+            if (is_file($file)) unlink($file);
+            $db->close();
+        }
+    }
+
+    public function testHpStyleModalKeepsKeyImmutableAndDeveloperDeletionRemovesAllLanguages(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $translations->registerWithValue('bo', 'admins.example', 'Ancienne description', 'fr', 'Texte initial');
+            self::assertSame('Texte initial', $translations->entries('bo', 'fr', 'admins')[0]['value']);
+            $translations->save('bo', 'en', 'admins.example', 'English text');
+            $translations->updateKeyWithValue('bo', 'admins.example', 'Nouvelle description', 'fr', 'Texte modifié');
+            $rows = $translations->entries('bo', 'fr', 'admins');
+            self::assertSame('admins.example', $rows[0]['translation_key']);
+            self::assertSame('Nouvelle description', $rows[0]['description']);
+            self::assertSame('Texte modifié', $rows[0]['value']);
+            self::assertSame('English text', $translations->entries('bo', 'en', 'admins')[0]['value']);
+            $translations->deleteKey('bo', 'admins.example');
+            self::assertSame([], $translations->entries('bo', 'fr', 'admins'));
+            self::assertSame([], $translations->entries('bo', 'en', 'admins'));
+            self::assertSame(0, (int) $db->fetchOne(
+                'SELECT COUNT(*) FROM symsvel_translation_keys WHERE translation_key = ?',
+                ['admins.example'],
+            ));
+        } finally {
+            $db->close();
+        }
+    }
+
+    public function testDeveloperOnlyKeyDeletionIsEnforcedByServerRole(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $translations->registerWithValue('bo', 'admins.example', null, 'fr', 'Une valeur');
+            $request = \Symfony\Component\HttpFoundation\Request::create(
+                '/apibo/languages/translations/keys?scope=bo&key=admins.example', 'DELETE'
+            );
+            $gate = $this->createMock(\SymSvel\Module\Acls\Access\BoAccessGate::class);
+            $gate->method('check')->willReturn(
+                new \SymSvel\Module\Acls\Access\BoAccessDecision(200, 1, 'ROLE_SUPER_ADMIN')
+            );
+            $controller = new \SymSvel\Module\Languages\Controller\BoTranslationsController(
+                $gate, $translations, new TranslationCsvTransfer($db), 'dev', sys_get_temp_dir()
+            );
+            self::assertSame(403, $controller->deleteKey($request)->getStatusCode());
+            self::assertCount(1, $translations->entries('bo', 'fr', 'admins'));
+
+            $devGate = $this->createMock(\SymSvel\Module\Acls\Access\BoAccessGate::class);
+            $devGate->method('check')->willReturn(
+                new \SymSvel\Module\Acls\Access\BoAccessDecision(200, 2, 'ROLE_DEV')
+            );
+            $devController = new \SymSvel\Module\Languages\Controller\BoTranslationsController(
+                $devGate, $translations, new TranslationCsvTransfer($db), 'dev', sys_get_temp_dir()
+            );
+            self::assertSame(200, $devController->deleteKey($request)->getStatusCode());
+            self::assertSame([], $translations->entries('bo', 'fr', 'admins'));
+        } finally {
+            $db->close();
+        }
+    }
+
+    public function testLegacyBoComponentsCustomizationsSurviveSystemNamespace(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        $file = tempnam(sys_get_temp_dir(), 'symsvel-i18n-legacy-');
+        try {
+            $translations->save('bo', 'fr', 'components.first', 'Revenir au début');
+            file_put_contents($file, json_encode(['schema' => 1, 'entries' => [[
+                'scope' => 'bo', 'module' => 'system', 'key' => 'first',
+                'language' => 'fr', 'value' => 'Première page',
+            ]]], JSON_THROW_ON_ERROR));
+            $sync = new \SymSvel\Module\Languages\Service\TranslationSourceSynchronizer($db);
+            $result = $sync->sync($file);
+            self::assertSame(1, $result['protected']);
+            self::assertSame('Revenir au début', $translations->entries('bo', 'fr', 'system')[0]['value']);
+            self::assertSame(0, $sync->sync($file)['texts_updated']);
+            self::assertSame('Revenir au début', $translations->entries('bo', 'fr', 'components')[0]['value']);
+        } finally {
+            if (is_file($file)) unlink($file);
+            $db->close();
+        }
+    }
+
+    public function testLegacyAppAuthDashboardCustomizationIsPreserved(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        $file = tempnam(sys_get_temp_dir(), 'symsvel-app-dashboard-');
+        try {
+            $translations->save('app', 'fr', 'auth.dashboard', 'Mon espace spécial');
+            $translations->save('app', 'fr', 'auth.loggedIn', 'Session personnalisée');
+            file_put_contents($file, json_encode(['schema' => 1, 'entries' => [
+                ['scope' => 'app', 'module' => 'system', 'key' => 'dashboard.title',
+                    'language' => 'fr', 'value' => 'Mon espace'],
+                ['scope' => 'app', 'module' => 'system', 'key' => 'dashboard.loggedIn',
+                    'language' => 'fr', 'value' => 'Session App vérifiée.'],
+            ]], JSON_THROW_ON_ERROR));
+            $sync = new \SymSvel\Module\Languages\Service\TranslationSourceSynchronizer($db);
+            self::assertSame(2, $sync->sync($file)['protected']);
+            $rows = $translations->entries('app', 'fr', 'system');
+            self::assertSame('Session personnalisée', $rows[0]['value']);
+            self::assertSame('Mon espace spécial', $rows[1]['value']);
+            self::assertSame(2, $sync->sync($file)['protected']);
+        } finally {
+            if (is_file($file)) unlink($file);
+            $db->close();
+        }
+    }
+
+    public function testRejectsGeneratedModuleOwnerBeforeDatabaseWrites(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        $file = tempnam(sys_get_temp_dir(), 'symsvel-i18n-reserved-');
+        try {
+            file_put_contents($file, json_encode(['schema' => 1, 'entries' => [[
+                'scope' => 'bo', 'module' => 'generated', 'key' => 'title',
+                'language' => 'fr', 'value' => 'Forbidden owner',
+            ]]], JSON_THROW_ON_ERROR));
+            try {
+                (new \SymSvel\Module\Languages\Service\TranslationSourceSynchronizer($db))->sync($file);
+                self::fail('Generated is a reserved translation owner.');
+            } catch (\InvalidArgumentException) {
+                self::assertSame([], $translations->entries('bo', 'fr'));
+            }
+        } finally {
+            if (is_file($file)) unlink($file);
+            $db->close();
+        }
+    }
+
+    public function testPublishedDictionariesContainOnlyExplicitCustomizations(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $translations->registerKey('bo', 'auth.default');
+            $db->insert('symsvel_translations', [
+                'scope' => 'bo', 'translation_key' => 'auth.default',
+                'language' => 'en', 'text_value' => 'Module default', 'customized' => false,
+            ]);
+            $translations->save('bo', 'fr', 'auth.frenchOnly', 'Personnalisé en français');
+            $translations->save('bo', 'en', 'auth.signIn', 'Custom sign in');
+            $published = $translations->export('bo', 'en', true);
+            self::assertSame(1, $published['entries']);
+            self::assertStringContainsString('Custom sign in', $published['content']);
+            self::assertStringNotContainsString('Module default', $published['content']);
+            self::assertStringNotContainsString('Personnalisé en français', $published['content']);
+            $complete = $translations->export('bo', 'en');
+            self::assertSame(3, $complete['entries']);
+            self::assertStringContainsString('Module default', $complete['content']);
+            self::assertStringContainsString('Personnalisé en français', $complete['content']);
+        } finally {
+            $db->close();
+        }
+    }
+
+    public function testExportPreservesNumericKeySegmentsAsObjects(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $translations->save('bo', 'fr', 'auth.strengthLevels.0', 'Aucune saisie');
+            $translations->save('bo', 'fr', 'auth.strengthLevels.1', 'Très faible');
+            $export = $translations->export('bo', 'fr');
+            self::assertStringContainsString('"strengthLevels": {', $export['content']);
+            self::assertStringContainsString('"0": "Aucune saisie"', $export['content']);
+            self::assertStringContainsString('"1": "Très faible"', $export['content']);
+            self::assertStringNotContainsString('"strengthLevels": [', $export['content']);
+        } finally {
+            $db->close();
+        }
+    }
+
+    public function testKeyExistsBeforeAnyTranslationIsSaved(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $translations->registerKey('app', 'account.confirm', 'Account confirmation');
+            $rows = $translations->entries('app', 'fr');
+            self::assertCount(1, $rows);
+            self::assertSame('account.confirm', $rows[0]['translation_key']);
+            self::assertSame('Account confirmation', $rows[0]['description']);
+            self::assertTrue($rows[0]['missing_translation']);
+            self::assertSame('', $rows[0]['fallback_value']);
+
+            $this->expectException(\DomainException::class);
+            $translations->registerKey('app', 'account.confirm');
+        } finally {
+            $db->close();
+        }
+    }
+
+    public function testCsvPreviewApplyAndNonDestructiveRoundTrip(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $csv = new TranslationCsvTransfer($db);
+            $translations->save('bo', 'fr', 'auth.signIn', 'Connexion');
+            $translations->save('bo', 'en', 'auth.signIn', 'Sign in');
+            $translations->registerKey('app', 'profile.title', 'Profile heading');
+            $export = $csv->export();
+            self::assertSame(3, $export['rows']);
+            self::assertStringContainsString('scope,key,description,language,value', $export['content']);
+            self::assertStringContainsString('app,profile.title,"Profile heading",,', $export['content']);
+
+            $incoming = "scope,key,description,language,value\n"
+                ."bo,auth.signIn,,en,Log in\n"
+                ."bo,auth.signIn,,fr,\n"
+                ."bo,auth.signUp,,fr,Créer un compte\n"
+                ."bo,auth.signUp,,en,Sign up\n";
+            $preview = $csv->import($incoming);
+            self::assertFalse($preview['applied']);
+            self::assertSame(0, $preview['keys_updated']);
+            self::assertSame(1, $preview['keys_created']);
+            self::assertSame(2, $preview['texts_created']);
+            self::assertSame(1, $preview['texts_updated']);
+            self::assertSame('Sign in', $translations->entries('bo', 'en')[0]['value']);
+
+            $applied = $csv->import($incoming, true, $preview['sha256']);
+            self::assertTrue($applied['applied']);
+            self::assertSame('Log in', $translations->entries('bo', 'en')[0]['value']);
+            self::assertSame('Connexion', $translations->entries('bo', 'fr')[0]['value']);
+            self::assertCount(1, $translations->entries('app', 'fr'));
+            $again = $csv->import($incoming);
+            self::assertSame(0, $again['texts_updated']);
+            self::assertSame(0, $again['texts_created']);
+        } finally {
+            $db->close();
+        }
+    }
+
+    public function testCsvRejectsDuplicateAndPreservesDatabaseOnError(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $csv = new TranslationCsvTransfer($db);
+            $translations->save('bo', 'fr', 'test.label', 'Original');
+            $incoming = "scope,key,description,language,value\n"
+                ."bo,test.label,,fr,Changed\n"
+                ."bo,test.label,,fr,Another\n";
+            try {
+                $csv->import($incoming, true, hash('sha256', $incoming));
+                self::fail('Duplicate CSV row must be rejected.');
+            } catch (\InvalidArgumentException) {
+                self::assertSame('Original', $translations->entries('bo', 'fr')[0]['value']);
+            }
+            $this->expectException(\InvalidArgumentException::class);
+            $csv->import("scope,key,description,language,value\nbo,test.label,,zz,Unknown\n");
+        } finally {
+            $db->close();
+        }
+    }
+
+    public function testRejectsUnsafeKeysAndScope(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $this->expectException(\InvalidArgumentException::class);
+            $translations->save('bo', 'fr', '../bad', 'value');
+        } finally {
+            $db->close();
+        }
+    }
+
+    public function testRejectsUnsupportedScope(): void
+    {
+        [$translations, , $db] = $this->catalog();
+        try {
+            $this->expectException(\InvalidArgumentException::class);
+            $translations->export('../backend', 'fr');
+        } finally {
+            $db->close();
+        }
+    }
+}

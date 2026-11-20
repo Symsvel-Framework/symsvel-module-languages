@@ -1,8 +1,15 @@
 {
     "schema": 1,
     "name": "Languages",
-    "dependencies": {},
-    "tables": [],
+    "dependencies": {
+        "settings": "*",
+        "acls": "*"
+    },
+    "tables": [
+        "symsvel_languages",
+        "symsvel_translations",
+        "symsvel_translation_keys"
+    ],
     "components": {
         "back": "back",
         "bo": "bo",

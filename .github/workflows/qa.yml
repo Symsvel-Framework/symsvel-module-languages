@@ -1,5 +1,9 @@
 name: QA
-on: [push, pull_request]
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
 jobs:
   test:
     runs-on: [self-hosted, linux, ARM64, symsvel]
@@ -9,5 +13,111 @@ jobs:
         run: |
           php -v
           php -r 'if (PHP_VERSION_ID < 80400 || PHP_VERSION_ID >= 80500) { exit(1); }'
-      - run: composer install --no-interaction --prefer-dist
+      - name: Install private Acls development contract
+        env:
+          SYMSVEL_READ_TOKEN: ${{ secrets.SYMSVEL_READ_TOKEN }}
+        run: |
+          if [ -z "$SYMSVEL_READ_TOKEN" ]; then echo "::error::SYMSVEL_READ_TOKEN missing"; exit 1; fi
+          export COMPOSER_AUTH="$(php -r 'echo json_encode(["github-oauth" => ["github.com" => getenv("SYMSVEL_READ_TOKEN")]], JSON_THROW_ON_ERROR);')"
+          composer install --no-interaction --prefer-dist --no-progress
+      - name: Lint module and migrations
+        run: find back/src back/tests Migration -name '*.php' -print0 | xargs -0 -n1 php -l
       - run: composer qa
+
+
+  bo-integration:
+    runs-on: [self-hosted, linux, ARM64, symsvel]
+    steps:
+      - name: Checkout languages module
+        uses: actions/checkout@v4
+      - name: Checkout BO host on dev
+        uses: actions/checkout@v4
+        with:
+          repository: Symsvel-Framework/symsvel-bo
+          ref: dev
+          path: assembled-bo
+          token: ${{ secrets.SYMSVEL_READ_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: assembled-bo/package-lock.json
+      - name: Assemble languages routes like Tooling
+        run: |
+          mkdir -p assembled-bo/src/lib/modules/languages/routes/languages/translations
+          mkdir -p assembled-bo/src/routes/languages/translations
+          mkdir -p assembled-bo/src/lib/translations/languages
+          cp bo/src/lib/modules/languages/*.ts assembled-bo/src/lib/modules/languages/
+          cp bo/src/lib/translations/*.ts assembled-bo/src/lib/translations/languages/
+          cp bo/src/routes/languages/+page.svelte assembled-bo/src/lib/modules/languages/routes/languages/+page.svelte
+          cp bo/src/routes/languages/translations/+page.svelte assembled-bo/src/lib/modules/languages/routes/languages/translations/+page.svelte
+          cat > assembled-bo/src/routes/languages/+page.svelte <<'ROUTE'
+          <script lang="ts">
+            import ModulePage from '#lib/modules/languages/routes/languages/+page.svelte';
+          </script>
+          <ModulePage />
+          ROUTE
+          cat > assembled-bo/src/routes/languages/translations/+page.svelte <<'ROUTE'
+          <script lang="ts">
+            import ModulePage from '#lib/modules/languages/routes/languages/translations/+page.svelte';
+          </script>
+          <ModulePage />
+          ROUTE
+      - name: Install BO dependencies
+        working-directory: assembled-bo
+        run: npm ci --no-audit --no-fund
+      - name: Format assembled BO (same convention as BO CI)
+        working-directory: assembled-bo
+        run: npm run format
+      - name: Validate assembled BO types, style, build and tests
+        working-directory: assembled-bo
+        run: |
+          npm run check
+          npm run lint
+          npm run build
+          npm run test:unit -- --run
+
+  database-boolean-matrix:
+    # Shared Docker databases on the two local runners must be reset serially.
+    concurrency:
+      group: symsvel-languages-boolean-${{ matrix.engine }}
+      cancel-in-progress: false
+    runs-on: [self-hosted, linux, ARM64, symsvel]
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [postgres, mysql, mariadb]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify PHP 8.4 and PDO drivers
+        env:
+          ENGINE: ${{ matrix.engine }}
+        run: |
+          php -r '$driver = getenv("ENGINE") === "postgres" ? "pdo_pgsql" : "pdo_mysql"; if (PHP_VERSION_ID < 80400 || PHP_VERSION_ID >= 80500 || !extension_loaded($driver)) { fwrite(STDERR, "Missing PHP version or $driver\n"); exit(1); }'
+      - name: Install private dependencies
+        env:
+          SYMSVEL_READ_TOKEN: ${{ secrets.SYMSVEL_READ_TOKEN }}
+        run: |
+          if [ -z "$SYMSVEL_READ_TOKEN" ]; then echo "::error::SYMSVEL_READ_TOKEN missing"; exit 1; fi
+          export COMPOSER_AUTH="$(php -r 'echo json_encode(["github-oauth" => ["github.com" => getenv("SYMSVEL_READ_TOKEN")]], JSON_THROW_ON_ERROR);')"
+          composer install --no-interaction --prefer-dist --no-progress
+      - name: Exercise typed translation flags against a real database
+        env:
+          ENGINE: ${{ matrix.engine }}
+          SYMSVEL_CI_POSTGRES_PASSWORD: ${{ secrets.SYMSVEL_CI_POSTGRES_PASSWORD }}
+        run: |
+          if [ -z "$SYMSVEL_CI_POSTGRES_PASSWORD" ]; then echo "::error::Database secret missing"; exit 1; fi
+          case "$ENGINE" in
+            postgres)
+              export PGPASSWORD="$SYMSVEL_CI_POSTGRES_PASSWORD"
+              pg_isready -h postgres -U symsvel_ci -d postgres
+              dropdb --if-exists --force -h postgres -U symsvel_ci symsvel_languages_bool_ci
+              createdb -h postgres -U symsvel_ci symsvel_languages_bool_ci
+              export SYMSVEL_LANGUAGES_TEST_DATABASE_URL="$(php -r 'echo "postgresql://symsvel_ci:".rawurlencode(getenv("SYMSVEL_CI_POSTGRES_PASSWORD"))."@postgres:5432/symsvel_languages_bool_ci";')"
+              ;;
+            mysql|mariadb)
+              mysql --host="$ENGINE" --user=root --password="$SYMSVEL_CI_POSTGRES_PASSWORD" --execute='DROP DATABASE IF EXISTS symsvel_languages_bool_ci; CREATE DATABASE symsvel_languages_bool_ci'
+              export SYMSVEL_LANGUAGES_TEST_DATABASE_URL="$(php -r 'echo "mysql://root:".rawurlencode(getenv("SYMSVEL_CI_POSTGRES_PASSWORD"))."@".getenv("ENGINE").":3306/symsvel_languages_bool_ci";')"
+              ;;
+          esac
+          vendor/bin/phpunit -c back/phpunit.xml.dist back/tests/Integration/TranslationSourceDbalMatrixTest.php
