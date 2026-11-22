@@ -38,6 +38,12 @@ exécutés par la CI auto-hébergée. L'installation complète, la
 compilation réelle des migrations et les quatre SGBD restent soumis
 au crash-test XT. Aucune publication stable avant cette validation.
 
+## Intégration continue GitHub-hosted (22/11/2026)
+
+Le workflow actif `.github/workflows/qa.yml` s'exécute désormais sur **GitHub-hosted Ubuntu 24.04**, sans runner Docker local. La matrice conserve les tests PostgreSQL 17, MySQL 8.4 et MariaDB 11.8 sur services jetables ; l'intégration BO Svelte est aussi testée. L'ancien `qa.yml.stub`, lorsqu'il existe, est une archive inactive.
+
+Les runners auto-hébergés restent réservés aux dépôts privés `symsvel-packages` et `symsvel-recipes`. Les crash-tests locaux restent requis indépendamment de la CI.
+
 ## Licence MIT et contributions
 
 Ce dépôt est distribué sous [licence MIT](LICENSE). Le code peut être utilisé, modifié et redistribué, y compris dans des projets commerciaux ou propriétaires, dans les conditions de cette licence (notamment la conservation de la notice de copyright et de licence).
