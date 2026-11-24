@@ -277,3 +277,7 @@ Après l'ouverture d'une PR draft, les pushes de sa branche sont validés par le
 ### Contrat UX HP : libellés de contexte et validation inline (19/11/2026)
 
 La page Traductions affiche deux langues indépendantes : `uiLanguage` pour **Langue d'interface** et le code sélectionné pour **Éditer en**. Les nouveaux libellés `bo.languages.editor.interfaceLanguage`, `editingIn` et `validate` sont fournis par les dictionnaires FR/EN du module et testés avec `translationCopy`. La validation d'une ligne existante utilise `PATCH /apibo/languages/translations/keys` pour la description et la valeur de la langue courante ; le formulaire de création reste une modale et appelle toujours `POST`. Le composant Dropdown est un élément partagé du BO, pas une dépendance PHP ni une copie dans Languages.
+
+## Branding et sécurité
+
+Les écrans du module lisent le nom public via `getProjectBrand()` du BO et affichent `$brandName`. Le layout effectue la requête ; le module ne crée ni état ni requête indépendante. L'intégration est vérifiée par la QA ; le CT doit vérifier les titres avec un nom de projet personnalisé. La QA PHP exécute également `composer audit --locked` après installation, sans exclusion d'avis.
