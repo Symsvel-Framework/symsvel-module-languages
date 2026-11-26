@@ -125,3 +125,8 @@ Activation et préouverture de langue : vert pour activer, orange pour désactiv
 La finalité est portée par `DataAction.variant` et `Button.variant`, pas par le libellé traduit.
 Les jetons et le thème clair/sombre restent dans le Design System BO.
 Voir `symsvel-bo/docs/dev/bo-components.md`. Tests CI et CT XT nécessaires.
+
+
+## Actions de validation des traductions (26/11/2026)
+
+La validation d’une traduction en ligne, l’application d’un import CSV et la confirmation de création d’une clé utilisent `Button variant="success"` du BO. L’ouverture de l’éditeur reste primaire, les aperçus, annulations et exports restent secondaires, et les suppressions restent `danger`. Aucun changement de traitement, de permission ni de stockage.
