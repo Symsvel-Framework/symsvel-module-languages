@@ -281,3 +281,8 @@ La page Traductions affiche deux langues indépendantes : `uiLanguage` pour **La
 ## Branding et sécurité
 
 Les écrans du module lisent le nom public via `getProjectBrand()` du BO et affichent `$brandName`. Le layout effectue la requête ; le module ne crée ni état ni requête indépendante. L'intégration est vérifiée par la QA ; le CT doit vérifier les titres avec un nom de projet personnalisé. La QA PHP exécute également `composer audit --locked` après installation, sans exclusion d'avis.
+
+
+## Actions de validation des traductions (26/11/2026)
+
+La validation d’une traduction en ligne, l’application d’un import CSV et la confirmation de création d’une clé utilisent `Button variant="success"` du BO. L’ouverture de l’éditeur reste primaire, les aperçus, annulations et exports restent secondaires, et les suppressions restent `danger`. Aucun changement de traitement, de permission ni de stockage.

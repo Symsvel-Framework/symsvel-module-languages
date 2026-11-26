@@ -464,7 +464,7 @@
         {#if csvName}<p>{csvName}</p>{/if}
         <div class="actions">
           <Button type="button" variant="secondary" onclick={() => importCsv('preview')} disabled={busy || !csvContent}>{t.csvPreview}</Button>
-          <Button type="button" onclick={() => importCsv('apply')} disabled={busy || !csvPreview || csvPreview.applied}>{t.csvApply}</Button>
+          <Button type="button" variant="success" onclick={() => importCsv('apply')} disabled={busy || !csvPreview || csvPreview.applied}>{t.csvApply}</Button>
         </div>
         {#if csvPreview}
           <p role="status">{t.csvRows}: {csvPreview.rows},
@@ -567,7 +567,7 @@
                   <td><span class:missing={entry.missing_translation} class="status">{entry.missing_translation ? t.missing : t.complete}</span></td>
                   <td class="row-actions">
                     {#if editingKey === entry.translation_key}
-                      <Button type="button" onclick={() => { void saveInline(entry); }}
+                      <Button type="button" variant="success" onclick={() => { void saveInline(entry); }}
                         loading={savingRow === entry.translation_key} disabled={busy || !!savingRow}>{t.validate}</Button>
                       <Button type="button" variant="secondary" onclick={cancelEdit}
                         disabled={busy || !!savingRow}>{t.cancel}</Button>
@@ -607,7 +607,7 @@
       <label>{t.value} ({language.toUpperCase()})<textarea bind:value={value} rows="4" maxlength="8192"></textarea></label>
       <div class="actions modal-actions">
         <Button type="button" variant="secondary" onclick={() => { editorOpen = false; }} disabled={busy}>{t.cancel}</Button>
-        <Button type="submit" loading={busy} disabled={busy || !key.trim()}>{t.createKey}</Button>
+        <Button type="submit" variant="success" loading={busy} disabled={busy || !key.trim()}>{t.createKey}</Button>
       </div>
     </form>
   </Modal>

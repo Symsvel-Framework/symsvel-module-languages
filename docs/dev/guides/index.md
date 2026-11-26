@@ -29,3 +29,8 @@ Tooling installe les dictionnaires dans src/lib/translations/catalogue/<lang>.ts
 ## API
 
 GET /apiopen/languages et GET /api/languages exposent les langues disponibles ; GET /apibo/languages permet leur gestion BO selon les ACLs. Les choix de langue d'un compte sont accessibles via GET /apiopen/languages/account-options. Un texte de secours affiché n'est pas une traduction persistée dans la langue cible.
+
+
+## Actions de validation des traductions (26/11/2026)
+
+La validation d’une traduction en ligne, l’application d’un import CSV et la confirmation de création d’une clé utilisent `Button variant="success"` du BO. L’ouverture de l’éditeur reste primaire, les aperçus, annulations et exports restent secondaires, et les suppressions restent `danger`. Aucun changement de traitement, de permission ni de stockage.
